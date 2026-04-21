@@ -3,6 +3,7 @@
 import { useEffect, type CSSProperties } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { AuthSplash } from '@/components/AuthSplash'
 import { isProfileComplete } from '@/lib/profile'
 import { useAuthProfile } from '@/lib/useAuthProfile'
 
@@ -68,12 +69,6 @@ export default function AuthCallbackPage() {
   }
 
   return (
-    <div style={pageStyle}>
-      <h1 style={{ marginBottom: 8 }}>Завершаем вход</h1>
-      <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
-        Проверяем аккаунт и подготавливаем ваш профиль.
-      </p>
-      <div style={{ ...cardStyle, ...secondaryTextStyle }}>Подождите немного...</div>
-    </div>
+    <AuthSplash />
   )
 }
