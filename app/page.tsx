@@ -4,6 +4,15 @@ import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
 
+import {
+  getProfileDisplayName,
+  isProfileComplete,
+  normalizeProfileText,
+  profileGenders,
+  profileSelect,
+  type Profile,
+  type ProfileGender,
+} from '@/lib/profile'
 import { supabase } from '@/lib/supabaseClient'
 
 type Participant = {
@@ -33,6 +42,8 @@ type RunCoordinates = {
   latitude: number
   longitude: number
 }
+
+type ProfileFormGender = ProfileGender | ''
 
 type ReverseGeocodeItem = {
   name?: string
@@ -183,6 +194,11 @@ const mapActionLinkStyle: CSSProperties = {
 }
 
 const paceOptions = ['05:00', '05:30', '06:00', '06:30', '07:00']
+const genderLabels: Record<ProfileGender, string> = {
+  male: 'Мужской',
+  female: 'Женский',
+  prefer_not_to_say: 'Предпочитаю не указывать',
+}
 const mapApiKey = process.env.NEXT_PUBLIC_2GIS_MAP_KEY
 const runnerFriendlyLocationPatterns = [
   /\bулиц/i,
@@ -433,6 +449,17 @@ function formatRunLocationName(locationName: string): string {
 export default function Home() {
   const [runs, setRuns] = useState<Run[]>([])
   const [session, setSession] = useState<Session | null>(null)
+  const [isAuthLoading, setIsAuthLoading] = useState(true)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [isProfileLoading, setIsProfileLoading] = useState(false)
+  const [profileError, setProfileError] = useState<string | null>(null)
+  const [profileReloadToken, setProfileReloadToken] = useState(0)
+  const [profileName, setProfileName] = useState('')
+  const [profileNickname, setProfileNickname] = useState('')
+  const [profileCity, setProfileCity] = useState('')
+  const [profileGender, setProfileGender] = useState<ProfileFormGender>('')
+  const [profileSubmitError, setProfileSubmitError] = useState<string | null>(null)
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [time, setTime] = useState('')
   const [durationMinutes, setDurationMinutes] = useState('')
   const [pace, setPace] = useState('')
@@ -445,12 +472,19 @@ export default function Home() {
   const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([])
   const [isLoadingLocationSuggestions, setIsLoadingLocationSuggestions] = useState(false)
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false)
+  const sessionUserId = session?.user.id ?? null
+  const hasCompletedProfile = isProfileComplete(profile)
   const isPaceValid = pace === '' || parsePaceInput(pace) !== null
   const selectedPace = parsePaceInput(pace) == null ? pace : finalizePaceInput(pace)
   const trimmedLocationName = locationName.trim()
   const isLocationNameEmpty = trimmedLocationName === ''
   const isSubmitDisabled =
-    !session || !isPaceValid || !selectedCoordinates || isLocationNameEmpty || isResolvingLocationName
+    !session ||
+    !hasCompletedProfile ||
+    !isPaceValid ||
+    !selectedCoordinates ||
+    isLocationNameEmpty ||
+    isResolvingLocationName
   const locationSubmitHint = isResolvingLocationName
     ? 'Создать пробежку можно после того, как место определится по карте.'
     : selectedCoordinates && isLocationNameEmpty
@@ -459,10 +493,26 @@ export default function Home() {
   const shouldSkipReverseGeocodeRef = useRef(false)
   const locationInputGroupRef = useRef<HTMLDivElement | null>(null)
 
+  const syncProfileForm = useCallback((nextProfile: Profile | null) => {
+    setProfileName(normalizeProfileText(nextProfile?.name))
+    setProfileNickname(normalizeProfileText(nextProfile?.nickname))
+    setProfileCity(normalizeProfileText(nextProfile?.city))
+    setProfileGender(nextProfile?.gender ?? '')
+  }, [])
+
+  const resetProfileState = useCallback(() => {
+    setProfile(null)
+    setProfileError(null)
+    setIsProfileLoading(false)
+    setProfileSubmitError(null)
+    syncProfileForm(null)
+  }, [syncProfileForm])
+
   const handleSelectedCoordinatesChange = useCallback((value: RunCoordinates | null) => {
     setSelectedCoordinates(value)
     setGeolocationError(null)
     setShowLocationSuggestions(false)
+    setIsLoadingLocationSuggestions(false)
     setLocationSuggestions([])
 
     if (value == null) {
@@ -482,7 +532,7 @@ export default function Home() {
   }
 
   async function joinRun(runId: string) {
-    if (!session?.access_token) {
+    if (!session?.access_token || !hasCompletedProfile) {
       return
     }
 
@@ -517,11 +567,7 @@ export default function Home() {
           return run
         }
 
-        const currentUserName =
-          session.user.user_metadata.name ??
-          session.user.user_metadata.full_name ??
-          session.user.email ??
-          null
+        const currentUserName = getProfileDisplayName(profile) ?? session.user.email ?? null
 
         const alreadyInParticipants = run.participants.some(
           (participant) => participant.id === session.user.id
@@ -549,7 +595,7 @@ export default function Home() {
   async function createRun(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (!session?.access_token) {
+    if (!session?.access_token || !hasCompletedProfile) {
       return
     }
 
@@ -597,6 +643,10 @@ export default function Home() {
     supabase.auth.getSession().then(({ data }) => {
       if (isMounted) {
         setSession(data.session ?? null)
+        if (!data.session) {
+          resetProfileState()
+        }
+        setIsAuthLoading(false)
       }
     })
 
@@ -604,13 +654,60 @@ export default function Home() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession)
+      if (!nextSession) {
+        resetProfileState()
+      }
+      setIsAuthLoading(false)
     })
 
     return () => {
       isMounted = false
       subscription.unsubscribe()
     }
-  }, [])
+  }, [resetProfileState])
+
+  useEffect(() => {
+    if (!sessionUserId) {
+      return
+    }
+
+    let isCancelled = false
+
+    async function loadProfile() {
+      setIsProfileLoading(true)
+      setProfileError(null)
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select(profileSelect)
+        .eq('id', sessionUserId)
+        .maybeSingle()
+
+      if (isCancelled) {
+        return
+      }
+
+      if (error) {
+        setProfile(null)
+        setProfileError('Не удалось загрузить профиль. Попробуйте ещё раз.')
+        setIsProfileLoading(false)
+        return
+      }
+
+      const nextProfile = data ?? null
+
+      setProfile(nextProfile)
+      setProfileSubmitError(null)
+      syncProfileForm(nextProfile)
+      setIsProfileLoading(false)
+    }
+
+    void loadProfile()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [profileReloadToken, sessionUserId, syncProfileForm])
 
   useEffect(() => {
     let isMounted = true
@@ -646,10 +743,78 @@ export default function Home() {
     }
   }
 
+  async function signOut() {
+    const { error } = await supabase.auth.signOut()
+
+    if (error) {
+      console.error(error)
+    }
+  }
+
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!session?.user.id) {
+      return
+    }
+
+    const trimmedName = profileName.trim()
+    const trimmedNickname = profileNickname.trim()
+    const trimmedCity = profileCity.trim()
+
+    if (
+      trimmedName === '' ||
+      trimmedNickname === '' ||
+      trimmedCity === '' ||
+      !profileGenders.includes(profileGender as ProfileGender)
+    ) {
+      setProfileSubmitError('Заполните все обязательные поля.')
+      return
+    }
+
+    setIsSavingProfile(true)
+    setProfileSubmitError(null)
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .upsert(
+        {
+          id: session.user.id,
+          name: trimmedName,
+          nickname: trimmedNickname,
+          city: trimmedCity,
+          gender: profileGender,
+        },
+        {
+          onConflict: 'id',
+        }
+      )
+      .select(profileSelect)
+      .single()
+
+    setIsSavingProfile(false)
+
+    if (error) {
+      if (error.code === '23505') {
+        setProfileSubmitError('Этот ник уже занят. Выберите другой.')
+        return
+      }
+
+      console.error(error)
+      setProfileSubmitError('Не удалось сохранить профиль. Попробуйте ещё раз.')
+      return
+    }
+
+    setProfile(data)
+    syncProfileForm(data)
+  }
+
   function selectLocationSuggestion(suggestion: LocationSuggestion) {
     shouldSkipReverseGeocodeRef.current = true
+    setIsResolvingLocationName(false)
     setLocationName(suggestion.label)
     setLocationLookupError(null)
+    setIsLoadingLocationSuggestions(false)
     setLocationSuggestions([])
     setShowLocationSuggestions(false)
     handleSelectedCoordinatesChange({
@@ -668,6 +833,7 @@ export default function Home() {
     setGeolocationError(null)
     setLocationLookupError(null)
     setShowLocationSuggestions(false)
+    setIsLoadingLocationSuggestions(false)
     setLocationSuggestions([])
 
     navigator.geolocation.getCurrentPosition(
@@ -694,12 +860,6 @@ export default function Home() {
     const trimmedLocationName = locationName.trim()
 
     if (!showLocationSuggestions || !mapApiKey || trimmedLocationName.length < 3) {
-      setIsLoadingLocationSuggestions(false)
-
-      if (trimmedLocationName.length < 3) {
-        setLocationSuggestions([])
-      }
-
       return
     }
 
@@ -762,7 +922,7 @@ export default function Home() {
       window.clearTimeout(searchTimeout)
       abortController.abort()
     }
-  }, [locationName, mapApiKey, selectedCoordinates, showLocationSuggestions])
+  }, [locationName, selectedCoordinates, showLocationSuggestions])
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent | TouchEvent) {
@@ -774,6 +934,7 @@ export default function Home() {
 
       if (target instanceof Node && !locationInputGroupRef.current.contains(target)) {
         setShowLocationSuggestions(false)
+        setIsLoadingLocationSuggestions(false)
       }
     }
 
@@ -788,12 +949,6 @@ export default function Home() {
 
   useEffect(() => {
     if (!selectedCoordinates || !mapApiKey) {
-      setIsResolvingLocationName(false)
-
-      if (!selectedCoordinates) {
-        setLocationLookupError(null)
-      }
-
       return
     }
 
@@ -803,8 +958,6 @@ export default function Home() {
 
     if (shouldSkipReverseGeocodeRef.current) {
       shouldSkipReverseGeocodeRef.current = false
-      setIsResolvingLocationName(false)
-      setLocationLookupError(null)
       return
     }
 
@@ -860,7 +1013,7 @@ export default function Home() {
     return () => {
       abortController.abort()
     }
-  }, [selectedCoordinates, mapApiKey])
+  }, [selectedCoordinates])
 
   return (
     <div style={pageStyle}>
@@ -869,27 +1022,125 @@ export default function Home() {
         Найдите компанию для пробежки или создайте свою.
       </p>
 
-      {!session && (
-        <div style={{ marginBottom: 16 }}>
-          <button type="button" onClick={signInWithGoogle}>
-            Войти через Google
+      {isAuthLoading && (
+        <div style={{ ...cardStyle, ...secondaryTextStyle }}>Проверяем вход...</div>
+      )}
+
+      {!isAuthLoading && !session && (
+        <>
+          <div style={{ marginBottom: 16 }}>
+            <button type="button" onClick={signInWithGoogle}>
+              Войти через Google
+            </button>
+          </div>
+
+          <div style={{ ...cardStyle, ...secondaryTextStyle, marginBottom: 20 }}>
+            Чтобы создать пробежку или присоединиться, войдите через Google.
+          </div>
+        </>
+      )}
+
+      {!isAuthLoading && session?.user.email && (
+        <div style={{ ...secondaryTextStyle, marginBottom: 16 }}>
+          Вы вошли как {session.user.email}{' '}
+          <button type="button" onClick={signOut}>
+            Выйти
           </button>
         </div>
       )}
 
-      {session?.user.email && (
-        <div style={{ ...secondaryTextStyle, marginBottom: 16 }}>
-          Вы вошли как {session.user.email}
+      {!isAuthLoading && session && isProfileLoading && (
+        <div style={{ ...cardStyle, ...secondaryTextStyle }}>Загружаем профиль...</div>
+      )}
+
+      {!isAuthLoading && session && !isProfileLoading && profileError && (
+        <div style={cardStyle}>
+          <div style={{ marginBottom: 8, fontWeight: 600 }}>Не удалось загрузить профиль</div>
+          <div style={secondaryTextStyle}>Попробуйте загрузить данные ещё раз.</div>
+          <div style={{ marginTop: 12 }}>
+            <button type="button" onClick={() => setProfileReloadToken((current) => current + 1)}>
+              Повторить
+            </button>
+          </div>
         </div>
       )}
 
-      {!session && (
-        <div style={{ ...cardStyle, ...secondaryTextStyle }}>
-          Чтобы создать пробежку или присоединиться, войдите через Google.
-        </div>
+      {!isAuthLoading && session && !isProfileLoading && !profileError && !hasCompletedProfile && (
+        <form onSubmit={saveProfile} style={formStyle}>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Заполните профиль</h2>
+          <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 4 }}>
+            Это обязательный первый шаг перед использованием приложения.
+          </p>
+
+          <label htmlFor="profile_name" style={labelStyle}>
+            Имя
+            <input
+              id="profile_name"
+              type="text"
+              value={profileName}
+              onChange={(event) => setProfileName(event.target.value)}
+              required
+              style={inputStyle}
+            />
+          </label>
+
+          <label htmlFor="profile_nickname" style={labelStyle}>
+            Никнейм
+            <input
+              id="profile_nickname"
+              type="text"
+              value={profileNickname}
+              onChange={(event) => setProfileNickname(event.target.value)}
+              required
+              style={inputStyle}
+            />
+          </label>
+
+          <label htmlFor="profile_city" style={labelStyle}>
+            Город
+            <input
+              id="profile_city"
+              type="text"
+              value={profileCity}
+              onChange={(event) => setProfileCity(event.target.value)}
+              required
+              style={inputStyle}
+            />
+          </label>
+
+          <label htmlFor="profile_gender" style={labelStyle}>
+            Пол
+            <select
+              id="profile_gender"
+              value={profileGender}
+              onChange={(event) => setProfileGender(event.target.value as ProfileFormGender)}
+              required
+              style={inputStyle}
+            >
+              <option value="">Выберите вариант</option>
+              {profileGenders.map((gender) => (
+                <option key={gender} value={gender}>
+                  {genderLabels[gender]}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {profileSubmitError && (
+            <div style={{ color: '#b91c1c', fontSize: 14 }}>{profileSubmitError}</div>
+          )}
+
+          <div>
+            <button type="submit" disabled={isSavingProfile}>
+              {isSavingProfile ? 'Сохраняем...' : 'Сохранить профиль'}
+            </button>
+          </div>
+        </form>
       )}
 
-      <form onSubmit={createRun} style={formStyle}>
+      {!isAuthLoading && (!session || hasCompletedProfile) && (
+        <>
+          <form onSubmit={createRun} style={formStyle}>
         <h2 style={{ marginTop: 0, marginBottom: 16 }}>Создать пробежку</h2>
 
         <label htmlFor="time" style={labelStyle}>
@@ -966,11 +1217,17 @@ export default function Home() {
               onChange={(e) => {
                 setLocationName(e.target.value)
                 setLocationLookupError(null)
+                if (e.target.value.trim().length < 3) {
+                  setIsLoadingLocationSuggestions(false)
+                  setLocationSuggestions([])
+                }
                 setShowLocationSuggestions(true)
               }}
               onFocus={() => {
                 if (locationName.trim().length >= 3) {
                   setShowLocationSuggestions(true)
+                } else {
+                  setIsLoadingLocationSuggestions(false)
                 }
               }}
               autoComplete="off"
@@ -1064,12 +1321,12 @@ export default function Home() {
             Создать пробежку
           </button>
         </div>
-      </form>
+          </form>
 
-      {runs.length === 0 && <div style={cardStyle}>Пока нет пробежек</div>}
+          {runs.length === 0 && <div style={cardStyle}>Пока нет пробежек</div>}
 
-      {runs.map((run) => (
-        <div key={run.id} style={cardStyle}>
+          {runs.map((run) => (
+            <div key={run.id} style={cardStyle}>
           <div>
             <h3 style={{ marginTop: 0, marginBottom: 4 }}>{formatRunLocationName(run.location_name)}</h3>
             <div style={secondaryTextStyle}>{formatRunDateTime(run.time)}</div>
@@ -1122,12 +1379,14 @@ export default function Home() {
           )}
 
           <div style={{ marginTop: 16 }}>
-            <button type="button" onClick={() => joinRun(run.id)} disabled={!session}>
+            <button type="button" onClick={() => joinRun(run.id)} disabled={!session || !hasCompletedProfile}>
               Присоединиться
             </button>
           </div>
-        </div>
-      ))}
+            </div>
+          ))}
+        </>
+      )}
     </div>
   )
 }

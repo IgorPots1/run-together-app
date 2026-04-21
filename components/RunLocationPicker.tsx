@@ -135,11 +135,15 @@ export default function RunLocationPicker({
   const mapRef = useRef<MapInstance | null>(null)
   const markerRef = useRef<MarkerInstance | null>(null)
   const mapGlRef = useRef<MapGlApi | null>(null)
+  const valueRef = useRef(value)
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
 
   useEffect(() => {
+    valueRef.current = value
+  }, [value])
+
+  useEffect(() => {
     if (!apiKey) {
-      setStatus('idle')
       return
     }
 
@@ -158,21 +162,22 @@ export default function RunLocationPicker({
 
         mapGlRef.current = mapgl
 
-        const center: [number, number] = value
-          ? [value.longitude, value.latitude]
+        const initialValue = valueRef.current
+        const center: [number, number] = initialValue
+          ? [initialValue.longitude, initialValue.latitude]
           : defaultCenter
 
         const map = new mapgl.Map(mapId, {
           center,
-          zoom: value ? 15 : 11,
+          zoom: initialValue ? 15 : 11,
           key: activeApiKey,
         })
 
         mapRef.current = map
 
-        if (value) {
+        if (initialValue) {
           markerRef.current = new mapgl.Marker(map, {
-            coordinates: [value.longitude, value.latitude],
+            coordinates: [initialValue.longitude, initialValue.latitude],
           })
         }
 

@@ -1,3 +1,4 @@
+import { getProfileDisplayName, isProfileComplete } from '@/lib/profile'
 import { supabase } from '@/lib/supabaseClient'
 
 type JoinRunBody = {
@@ -31,6 +32,20 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('name, nickname, city, gender')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (profileError) {
+    return Response.json({ error: 'Failed to verify profile' }, { status: 500 })
+  }
+
+  if (!isProfileComplete(profile)) {
+    return Response.json({ error: 'Profile is incomplete' }, { status: 403 })
+  }
+
   const { run_id } = body
 
   if (!run_id) {
@@ -38,11 +53,7 @@ export async function POST(request: Request) {
   }
 
   const joinedAt = new Date().toISOString()
-  const joinedUserName =
-    user.user_metadata.name ??
-    user.user_metadata.full_name ??
-    user.email ??
-    null
+  const joinedUserName = getProfileDisplayName(profile) ?? user.email ?? null
 
   const { error } = await supabase.from('run_participants').insert({
     run_id,

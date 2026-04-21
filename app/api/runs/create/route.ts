@@ -1,3 +1,4 @@
+import { isProfileComplete } from '@/lib/profile'
 import { supabase } from '@/lib/supabaseClient'
 
 type CreateRunBody = {
@@ -37,6 +38,20 @@ export async function POST(request: Request) {
 
   if (authError || !user) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('name, nickname, city, gender')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (profileError) {
+    return Response.json({ error: 'Failed to verify profile' }, { status: 500 })
+  }
+
+  if (!isProfileComplete(profile)) {
+    return Response.json({ error: 'Profile is incomplete' }, { status: 403 })
   }
 
   const {
