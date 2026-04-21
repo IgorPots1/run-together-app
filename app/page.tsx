@@ -1,7 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
 
 import { supabase } from '@/lib/supabaseClient'
@@ -32,6 +32,22 @@ type Run = {
 type RunCoordinates = {
   latitude: number
   longitude: number
+}
+
+type ReverseGeocodeItem = {
+  name?: string
+  address_name?: string
+  building_name?: string
+  full_name?: string
+}
+
+type ReverseGeocodeResponse = {
+  meta?: {
+    code?: number
+  }
+  result?: {
+    items?: ReverseGeocodeItem[]
+  }
 }
 
 const pageStyle: CSSProperties = {
@@ -208,6 +224,42 @@ function build2GisUrl(latitude: number, longitude: number): string {
   return `https://2gis.ru/geo/${longitude},${latitude}`
 }
 
+function normalizeLocationPart(value?: string): string | null {
+  if (!value) {
+    return null
+  }
+
+  const normalizedValue = value.replace(/\s+/g, ' ').trim()
+
+  return normalizedValue === '' ? null : normalizedValue
+}
+
+function resolveShortLocation(item: ReverseGeocodeItem): string | null {
+  const name = normalizeLocationPart(item.name)
+  const addressName = normalizeLocationPart(item.address_name)
+  const buildingName = normalizeLocationPart(item.building_name)
+  const fullName = normalizeLocationPart(item.full_name)
+
+  if (name && addressName && name !== addressName) {
+    return `${name}, ${addressName}`
+  }
+
+  return addressName ?? name ?? buildingName ?? fullName
+}
+
+function getGeolocationErrorMessage(code: number): string {
+  switch (code) {
+    case 1:
+      return 'Не удалось получить геопозицию: доступ запрещён.'
+    case 2:
+      return 'Не удалось определить вашу геопозицию.'
+    case 3:
+      return 'Не удалось получить геопозицию вовремя. Попробуйте ещё раз.'
+    default:
+      return 'Не удалось получить вашу геопозицию.'
+  }
+}
+
 export default function Home() {
   const [runs, setRuns] = useState<Run[]>([])
   const [session, setSession] = useState<Session | null>(null)
@@ -216,8 +268,22 @@ export default function Home() {
   const [pace, setPace] = useState('')
   const [locationName, setLocationName] = useState('')
   const [selectedCoordinates, setSelectedCoordinates] = useState<RunCoordinates | null>(null)
+  const [isLocatingUser, setIsLocatingUser] = useState(false)
+  const [geolocationError, setGeolocationError] = useState<string | null>(null)
+  const [isResolvingLocationName, setIsResolvingLocationName] = useState(false)
+  const [locationLookupError, setLocationLookupError] = useState<string | null>(null)
   const isPaceValid = pace === '' || parsePaceInput(pace) !== null
   const selectedPace = parsePaceInput(pace) == null ? pace : finalizePaceInput(pace)
+
+  const handleSelectedCoordinatesChange = useCallback((value: RunCoordinates | null) => {
+    setSelectedCoordinates(value)
+    setGeolocationError(null)
+
+    if (value == null) {
+      setIsResolvingLocationName(false)
+      setLocationLookupError(null)
+    }
+  }, [])
 
   async function fetchRuns() {
     try {
@@ -394,6 +460,107 @@ export default function Home() {
     }
   }
 
+  function useMyLocation() {
+    if (!navigator.geolocation) {
+      setGeolocationError('Ваш браузер не поддерживает геолокацию.')
+      return
+    }
+
+    setIsLocatingUser(true)
+    setGeolocationError(null)
+    setLocationLookupError(null)
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        handleSelectedCoordinatesChange({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        })
+        setIsLocatingUser(false)
+      },
+      (error) => {
+        setGeolocationError(getGeolocationErrorMessage(error.code))
+        setIsLocatingUser(false)
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
+    )
+  }
+
+  useEffect(() => {
+    if (!selectedCoordinates || !mapApiKey) {
+      setIsResolvingLocationName(false)
+
+      if (!selectedCoordinates) {
+        setLocationLookupError(null)
+      }
+
+      return
+    }
+
+    const { latitude, longitude } = selectedCoordinates
+    const activeMapApiKey = mapApiKey
+    const abortController = new AbortController()
+
+    async function reverseGeocode() {
+      setIsResolvingLocationName(true)
+      setLocationLookupError(null)
+
+      try {
+        const url = new URL('https://catalog.api.2gis.com/3.0/items/geocode')
+        url.searchParams.set('lat', String(latitude))
+        url.searchParams.set('lon', String(longitude))
+        url.searchParams.set('locale', 'ru_RU')
+        url.searchParams.set('key', activeMapApiKey)
+
+        const response = await fetch(url, {
+          signal: abortController.signal,
+        })
+
+        if (!response.ok) {
+          throw new Error(`Reverse geocoding failed with status ${response.status}`)
+        }
+
+        const data: ReverseGeocodeResponse = await response.json()
+
+        if (data.meta?.code && data.meta.code >= 400) {
+          throw new Error(`Reverse geocoding failed with API code ${data.meta.code}`)
+        }
+
+        const resolvedLocation = resolveShortLocation(data.result?.items?.[0] ?? {})
+
+        if (!resolvedLocation) {
+          setLocationName('')
+          setLocationLookupError('Не удалось определить адрес. Укажите место вручную.')
+          return
+        }
+
+        setLocationName(resolvedLocation)
+      } catch (error) {
+        if (abortController.signal.aborted) {
+          return
+        }
+
+        console.error(error)
+        setLocationName('')
+        setLocationLookupError('Не удалось определить адрес. Укажите место вручную.')
+      } finally {
+        if (!abortController.signal.aborted) {
+          setIsResolvingLocationName(false)
+        }
+      }
+    }
+
+    void reverseGeocode()
+
+    return () => {
+      abortController.abort()
+    }
+  }, [selectedCoordinates])
+
   return (
     <div style={pageStyle}>
       <h1 style={{ marginBottom: 8 }}>Пробежки</h1>
@@ -494,10 +661,19 @@ export default function Home() {
             id="location_name"
             type="text"
             value={locationName}
-            onChange={(e) => setLocationName(e.target.value)}
+            onChange={(e) => {
+              setLocationName(e.target.value)
+              setLocationLookupError(null)
+            }}
             required
             style={inputStyle}
           />
+          {isResolvingLocationName && (
+            <div style={{ ...secondaryTextStyle, marginTop: 6 }}>Определяем адрес по выбранной точке...</div>
+          )}
+          {locationLookupError && (
+            <div style={{ color: '#b91c1c', fontSize: 14, marginTop: 6 }}>{locationLookupError}</div>
+          )}
         </label>
 
         <div>
@@ -505,16 +681,24 @@ export default function Home() {
           <RunLocationPicker
             apiKey={mapApiKey}
             value={selectedCoordinates}
-            onChange={setSelectedCoordinates}
+            onChange={handleSelectedCoordinatesChange}
           />
+          <div style={{ marginTop: 8 }}>
+            <button type="button" onClick={useMyLocation} disabled={isLocatingUser}>
+              {isLocatingUser ? 'Определяем геопозицию...' : 'Моя геопозиция'}
+            </button>
+          </div>
           <div style={{ ...secondaryTextStyle, marginTop: 8 }}>
             {selectedCoordinates
               ? `Выбрано: ${selectedCoordinates.latitude.toFixed(5)}, ${selectedCoordinates.longitude.toFixed(5)}`
               : 'Выберите одну точку на карте.'}
           </div>
+          {geolocationError && (
+            <div style={{ color: '#b91c1c', fontSize: 14, marginTop: 8 }}>{geolocationError}</div>
+          )}
           {selectedCoordinates && (
             <div style={{ marginTop: 8 }}>
-              <button type="button" onClick={() => setSelectedCoordinates(null)}>
+              <button type="button" onClick={() => handleSelectedCoordinatesChange(null)}>
                 Очистить точку
               </button>
             </div>
