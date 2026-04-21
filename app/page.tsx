@@ -24,6 +24,8 @@ type Run = {
   created_at: string
   participants: Participant[]
   participants_count: number
+  last_joined_user_name: string | null
+  last_joined_at: string | null
 }
 
 export default function Home() {
@@ -49,7 +51,7 @@ export default function Home() {
       return
     }
 
-    await fetch('/api/runs/join', {
+    const res = await fetch('/api/runs/join', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -60,7 +62,53 @@ export default function Home() {
       }),
     })
 
-    fetchRuns()
+    if (!res.ok) {
+      throw new Error('Failed to join run')
+    }
+
+    const data: {
+      already_joined: boolean
+      last_joined_user_name: string | null
+      last_joined_at: string | null
+    } = await res.json()
+
+    setRuns((currentRuns) =>
+      currentRuns.map((run) => {
+        if (run.id !== runId) {
+          return run
+        }
+
+        if (data.already_joined) {
+          return run
+        }
+
+        const currentUserName =
+          session.user.user_metadata.name ??
+          session.user.user_metadata.full_name ??
+          session.user.email ??
+          null
+
+        const alreadyInParticipants = run.participants.some(
+          (participant) => participant.id === session.user.id
+        )
+
+        return {
+          ...run,
+          participants_count: run.participants_count + 1,
+          participants: alreadyInParticipants
+            ? run.participants
+            : [
+                ...run.participants,
+                {
+                  id: session.user.id,
+                  name: currentUserName,
+                },
+              ],
+          last_joined_user_name: data.last_joined_user_name ?? currentUserName,
+          last_joined_at: data.last_joined_at,
+        }
+      })
+    )
   }
 
   async function createRun(event: FormEvent<HTMLFormElement>) {
@@ -235,6 +283,12 @@ export default function Home() {
           <div>{run.duration_minutes} мин</div>
           <div>Создатель: {run.creator_name ?? run.creator_id}</div>
           <div>Участников: {run.participants_count}</div>
+          {run.last_joined_user_name && (
+            <div>Last joined: {run.last_joined_user_name}</div>
+          )}
+          {!run.last_joined_user_name && run.last_joined_at && (
+            <div>+1 participant recently</div>
+          )}
           <div>
             Участники:
             {run.participants.length === 0 && ' Нет участников'}

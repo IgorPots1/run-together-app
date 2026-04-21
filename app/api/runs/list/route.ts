@@ -6,7 +6,7 @@ export async function GET() {
   const { data: runs, error } = await supabase
     .from('runs')
     .select(
-      'id, creator_id, time, duration_minutes, distance_km, pace_sec_per_km, location_name, lat, lng, created_at, run_participants(user_id)'
+      'id, creator_id, time, duration_minutes, distance_km, pace_sec_per_km, location_name, lat, lng, created_at, run_participants(user_id, created_at)'
     )
     .gt('time', now)
     .order('time', { ascending: true })
@@ -42,23 +42,45 @@ export async function GET() {
   }
 
   return Response.json(
-    (runs ?? []).map((run) => ({
-      id: run.id,
-      creator_id: run.creator_id,
-      creator_name: usersById.get(run.creator_id)?.name ?? null,
-      time: run.time,
-      duration_minutes: run.duration_minutes,
-      distance_km: run.distance_km,
-      pace_sec_per_km: run.pace_sec_per_km,
-      location_name: run.location_name,
-      lat: run.lat,
-      lng: run.lng,
-      created_at: run.created_at,
-      participants: (run.run_participants ?? []).map((participant) => ({
-        id: participant.user_id,
-        name: usersById.get(participant.user_id)?.name ?? null,
-      })),
-      participants_count: run.run_participants?.length ?? 0,
-    }))
+    (runs ?? []).map((run) => {
+      const lastJoinedParticipant =
+        (run.run_participants ?? []).reduce<{
+          user_id: string
+          created_at: string | null
+        } | null>((latest, participant) => {
+          if (!participant.created_at) {
+            return latest
+          }
+
+          if (!latest || participant.created_at > latest.created_at!) {
+            return participant
+          }
+
+          return latest
+        }, null) ?? null
+
+      return {
+        id: run.id,
+        creator_id: run.creator_id,
+        creator_name: usersById.get(run.creator_id)?.name ?? null,
+        time: run.time,
+        duration_minutes: run.duration_minutes,
+        distance_km: run.distance_km,
+        pace_sec_per_km: run.pace_sec_per_km,
+        location_name: run.location_name,
+        lat: run.lat,
+        lng: run.lng,
+        created_at: run.created_at,
+        participants: (run.run_participants ?? []).map((participant) => ({
+          id: participant.user_id,
+          name: usersById.get(participant.user_id)?.name ?? null,
+        })),
+        participants_count: run.run_participants?.length ?? 0,
+        last_joined_user_name: lastJoinedParticipant
+          ? usersById.get(lastJoinedParticipant.user_id)?.name ?? null
+          : null,
+        last_joined_at: lastJoinedParticipant?.created_at ?? null,
+      }
+    })
   )
 }
