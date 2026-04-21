@@ -1,5 +1,8 @@
 import { isProfileComplete } from '@/lib/profile'
-import { supabase } from '@/lib/supabaseClient'
+import {
+  createAuthenticatedSupabaseServerClient,
+  supabase,
+} from '@/lib/supabaseClient'
 
 type CreateRunBody = {
   time: string
@@ -40,14 +43,16 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { data: profile, error: profileError } = await supabase
+  const authenticatedSupabase = createAuthenticatedSupabaseServerClient(accessToken)
+
+  const { data: profile, error: profileError } = await authenticatedSupabase
     .from('profiles')
     .select('name, nickname, city, gender')
     .eq('id', user.id)
     .maybeSingle()
 
   if (profileError) {
-    return Response.json({ error: 'Failed to verify profile' }, { status: 500 })
+    return Response.json({ error: profileError.message }, { status: 500 })
   }
 
   if (!isProfileComplete(profile)) {
@@ -94,7 +99,7 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  const { data: run, error: runError } = await supabase
+  const { data: run, error: runError } = await authenticatedSupabase
     .from('runs')
     .insert({
       creator_id: user.id,
@@ -110,10 +115,13 @@ export async function POST(request: Request) {
     .single()
 
   if (runError || !run) {
-    return Response.json({ error: 'Failed to create run' }, { status: 500 })
+    return Response.json(
+      { error: runError?.message ?? 'Run was not created' },
+      { status: 500 }
+    )
   }
 
-  const { error: participantError } = await supabase
+  const { error: participantError } = await authenticatedSupabase
     .from('run_participants')
     .insert({
       run_id: run.id,
@@ -122,7 +130,7 @@ export async function POST(request: Request) {
     })
 
   if (participantError) {
-    return Response.json({ error: 'Failed to add creator to run' }, { status: 500 })
+    return Response.json({ error: participantError.message }, { status: 500 })
   }
 
   return Response.json(run, { status: 201 })
