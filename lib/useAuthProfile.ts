@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 
 import { profileSelect, type Profile } from '@/lib/profile'
@@ -38,16 +38,27 @@ type ProfileLoadStatus = 'idle' | 'loading' | 'ready' | 'error'
 export function useAuthProfile(): UseAuthProfileResult {
   const [session, setSession] = useState<Session | null>(null)
   const [isAuthLoading, setIsAuthLoading] = useState(true)
-  const [profile, setProfile] = useState<Profile | null>(null)
+  const [profile, setRawProfile] = useState<Profile | null>(null)
   const [profileLoadStatus, setProfileLoadStatus] = useState<ProfileLoadStatus>('idle')
   const [profileError, setProfileError] = useState<string | null>(null)
+  const [profileStateUserId, setProfileStateUserId] = useState<string | null>(null)
   const [profileReloadToken, setProfileReloadToken] = useState(0)
+  const currentSessionUserIdRef = useRef<string | null>(null)
 
-  const resetProfileState = useCallback(() => {
-    setProfile(null)
+  const resetProfileState = useCallback((nextUserId: string | null, nextStatus: ProfileLoadStatus) => {
+    setRawProfile(null)
     setProfileError(null)
-    setProfileLoadStatus('idle')
+    setProfileStateUserId(nextUserId)
+    setProfileLoadStatus(nextStatus)
   }, [])
+
+  const setProfile = useCallback(
+    (value: Profile | null) => {
+      setRawProfile(value)
+      setProfileStateUserId(currentSessionUserIdRef.current)
+    },
+    [],
+  )
 
   const reloadProfile = useCallback(() => {
     setProfileReloadToken((current) => current + 1)
@@ -56,30 +67,30 @@ export function useAuthProfile(): UseAuthProfileResult {
   useEffect(() => {
     let isMounted = true
 
+    function applySession(nextSession: Session | null) {
+      const nextUserId = nextSession?.user.id ?? null
+
+      if (currentSessionUserIdRef.current !== nextUserId) {
+        resetProfileState(nextUserId, nextUserId ? 'loading' : 'idle')
+      }
+
+      currentSessionUserIdRef.current = nextUserId
+      setSession(nextSession)
+      setIsAuthLoading(false)
+    }
+
     supabase.auth.getSession().then(({ data }) => {
       if (!isMounted) {
         return
       }
 
-      setSession(data.session ?? null)
-
-      if (!data.session) {
-        resetProfileState()
-      }
-
-      setIsAuthLoading(false)
+      applySession(data.session ?? null)
     })
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession)
-
-      if (!nextSession) {
-        resetProfileState()
-      }
-
-      setIsAuthLoading(false)
+      applySession(nextSession)
     })
 
     return () => {
@@ -99,8 +110,9 @@ export function useAuthProfile(): UseAuthProfileResult {
     let isCancelled = false
 
     async function ensureAndLoadProfile() {
+      setProfileStateUserId(sessionUserId)
       setProfileLoadStatus('loading')
-      setProfile(null)
+      setRawProfile(null)
       setProfileError(null)
 
       const bootstrapName = getBootstrapProfileName(user)
@@ -116,8 +128,9 @@ export function useAuthProfile(): UseAuthProfileResult {
       }
 
       if (bootstrapError) {
-        setProfile(null)
+        setRawProfile(null)
         setProfileError('Не удалось подготовить профиль. Попробуйте ещё раз.')
+        setProfileStateUserId(sessionUserId)
         setProfileLoadStatus('error')
         return
       }
@@ -133,13 +146,15 @@ export function useAuthProfile(): UseAuthProfileResult {
       }
 
       if (error) {
-        setProfile(null)
+        setRawProfile(null)
         setProfileError('Не удалось загрузить профиль. Попробуйте ещё раз.')
+        setProfileStateUserId(sessionUserId)
         setProfileLoadStatus('error')
         return
       }
 
-      setProfile(data ?? null)
+      setRawProfile(data ?? null)
+      setProfileStateUserId(sessionUserId)
       setProfileLoadStatus('ready')
     }
 
@@ -150,11 +165,17 @@ export function useAuthProfile(): UseAuthProfileResult {
     }
   }, [profileReloadToken, session, sessionUserId])
 
+  const isCurrentProfileState = sessionUserId !== null && profileStateUserId === sessionUserId
+  const currentProfile = isCurrentProfileState ? profile : null
+  const currentProfileError = isCurrentProfileState ? profileError : null
+
   const authProfileStatus: AuthProfileStatus = isAuthLoading
     ? 'loading'
     : !session
       ? 'signed_out'
-      : profileLoadStatus === 'error'
+      : !isCurrentProfileState
+        ? 'profile_loading'
+        : profileLoadStatus === 'error'
         ? 'error'
         : profileLoadStatus === 'ready'
           ? 'ready'
@@ -168,9 +189,9 @@ export function useAuthProfile(): UseAuthProfileResult {
     authProfileStatus,
     isBootstrapResolved,
     isAuthLoading,
-    profile,
+    profile: currentProfile,
     isProfileLoading,
-    profileError,
+    profileError: currentProfileError,
     reloadProfile,
     setProfile,
   }
