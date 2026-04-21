@@ -1,7 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
 
 import { supabase } from '@/lib/supabaseClient'
@@ -41,13 +41,28 @@ type ReverseGeocodeItem = {
   full_name?: string
 }
 
+type GeocodePoint = {
+  lat?: number
+  lon?: number
+}
+
+type GeocodeSearchItem = ReverseGeocodeItem & {
+  point?: GeocodePoint
+}
+
 type ReverseGeocodeResponse = {
   meta?: {
     code?: number
   }
   result?: {
-    items?: ReverseGeocodeItem[]
+    items?: GeocodeSearchItem[]
   }
+}
+
+type LocationSuggestion = {
+  label: string
+  latitude: number
+  longitude: number
 }
 
 const pageStyle: CSSProperties = {
@@ -82,6 +97,45 @@ const labelStyle: CSSProperties = {
 const secondaryTextStyle: CSSProperties = {
   color: '#475569',
   fontSize: 14,
+}
+
+const inputGroupStyle: CSSProperties = {
+  position: 'relative',
+}
+
+const suggestionsListStyle: CSSProperties = {
+  position: 'absolute',
+  top: '100%',
+  left: 0,
+  right: 0,
+  zIndex: 10,
+  marginTop: 6,
+  padding: 0,
+  listStyle: 'none',
+  border: '1px solid #cbd5e1',
+  borderRadius: 12,
+  backgroundColor: '#fff',
+  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.12)',
+  overflow: 'hidden',
+}
+
+const suggestionButtonStyle: CSSProperties = {
+  width: '100%',
+  padding: '12px',
+  border: 0,
+  borderBottom: '1px solid #e2e8f0',
+  backgroundColor: '#fff',
+  textAlign: 'left',
+  fontSize: 15,
+  lineHeight: 1.4,
+  cursor: 'pointer',
+}
+
+const suggestionStatusStyle: CSSProperties = {
+  padding: '12px',
+  fontSize: 14,
+  color: '#475569',
+  backgroundColor: '#fff',
 }
 
 const formStyle: CSSProperties = {
@@ -212,14 +266,6 @@ function formatParticipantName(participant: Participant): string {
   return participant.name ?? 'Участник'
 }
 
-function formatCoordinates(run: Pick<Run, 'latitude' | 'longitude'>): string {
-  if (run.latitude == null || run.longitude == null) {
-    return 'Точка на карте не указана'
-  }
-
-  return `${run.latitude.toFixed(5)}, ${run.longitude.toFixed(5)}`
-}
-
 function build2GisUrl(latitude: number, longitude: number): string {
   return `https://2gis.ru/geo/${longitude},${latitude}`
 }
@@ -260,6 +306,30 @@ function getGeolocationErrorMessage(code: number): string {
   }
 }
 
+function buildSuggestionFromItem(item: GeocodeSearchItem): LocationSuggestion | null {
+  if (item.point?.lat == null || item.point?.lon == null) {
+    return null
+  }
+
+  const label = resolveShortLocation(item)
+
+  if (!label) {
+    return null
+  }
+
+  return {
+    label,
+    latitude: item.point.lat,
+    longitude: item.point.lon,
+  }
+}
+
+function formatRunLocationName(locationName: string): string {
+  const normalizedLocationName = locationName.trim()
+
+  return normalizedLocationName === '' ? 'Точка на карте выбрана' : normalizedLocationName
+}
+
 export default function Home() {
   const [runs, setRuns] = useState<Run[]>([])
   const [session, setSession] = useState<Session | null>(null)
@@ -272,12 +342,19 @@ export default function Home() {
   const [geolocationError, setGeolocationError] = useState<string | null>(null)
   const [isResolvingLocationName, setIsResolvingLocationName] = useState(false)
   const [locationLookupError, setLocationLookupError] = useState<string | null>(null)
+  const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([])
+  const [isLoadingLocationSuggestions, setIsLoadingLocationSuggestions] = useState(false)
+  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false)
   const isPaceValid = pace === '' || parsePaceInput(pace) !== null
   const selectedPace = parsePaceInput(pace) == null ? pace : finalizePaceInput(pace)
+  const shouldSkipReverseGeocodeRef = useRef(false)
+  const locationInputGroupRef = useRef<HTMLDivElement | null>(null)
 
   const handleSelectedCoordinatesChange = useCallback((value: RunCoordinates | null) => {
     setSelectedCoordinates(value)
     setGeolocationError(null)
+    setShowLocationSuggestions(false)
+    setLocationSuggestions([])
 
     if (value == null) {
       setIsResolvingLocationName(false)
@@ -460,6 +537,18 @@ export default function Home() {
     }
   }
 
+  function selectLocationSuggestion(suggestion: LocationSuggestion) {
+    shouldSkipReverseGeocodeRef.current = true
+    setLocationName(suggestion.label)
+    setLocationLookupError(null)
+    setLocationSuggestions([])
+    setShowLocationSuggestions(false)
+    handleSelectedCoordinatesChange({
+      latitude: suggestion.latitude,
+      longitude: suggestion.longitude,
+    })
+  }
+
   function useMyLocation() {
     if (!navigator.geolocation) {
       setGeolocationError('Ваш браузер не поддерживает геолокацию.')
@@ -469,6 +558,8 @@ export default function Home() {
     setIsLocatingUser(true)
     setGeolocationError(null)
     setLocationLookupError(null)
+    setShowLocationSuggestions(false)
+    setLocationSuggestions([])
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -491,6 +582,101 @@ export default function Home() {
   }
 
   useEffect(() => {
+    const trimmedLocationName = locationName.trim()
+
+    if (!showLocationSuggestions || !mapApiKey || trimmedLocationName.length < 3) {
+      setIsLoadingLocationSuggestions(false)
+
+      if (trimmedLocationName.length < 3) {
+        setLocationSuggestions([])
+      }
+
+      return
+    }
+
+    const activeMapApiKey = mapApiKey
+    const abortController = new AbortController()
+    const searchTimeout = window.setTimeout(() => {
+
+      async function loadLocationSuggestions() {
+        setIsLoadingLocationSuggestions(true)
+
+        try {
+          const url = new URL('https://catalog.api.2gis.com/3.0/items/geocode')
+          url.searchParams.set('q', trimmedLocationName)
+          url.searchParams.set('fields', 'items.point')
+          url.searchParams.set('locale', 'ru_RU')
+          url.searchParams.set('limit', '5')
+          url.searchParams.set('key', activeMapApiKey)
+
+          if (selectedCoordinates) {
+            url.searchParams.set(
+              'location',
+              `${selectedCoordinates.longitude},${selectedCoordinates.latitude}`
+            )
+            url.searchParams.set('sort', 'distance')
+          }
+
+          const response = await fetch(url, {
+            signal: abortController.signal,
+          })
+
+          if (!response.ok) {
+            throw new Error(`Location search failed with status ${response.status}`)
+          }
+
+          const data: ReverseGeocodeResponse = await response.json()
+          const nextSuggestions = (data.result?.items ?? [])
+            .map(buildSuggestionFromItem)
+            .filter((item): item is LocationSuggestion => item !== null)
+
+          setLocationSuggestions(nextSuggestions)
+        } catch (error) {
+          if (abortController.signal.aborted) {
+            return
+          }
+
+          console.error(error)
+          setLocationSuggestions([])
+        } finally {
+          if (!abortController.signal.aborted) {
+            setIsLoadingLocationSuggestions(false)
+          }
+        }
+      }
+
+      void loadLocationSuggestions()
+    }, 250)
+
+    return () => {
+      window.clearTimeout(searchTimeout)
+      abortController.abort()
+    }
+  }, [locationName, mapApiKey, selectedCoordinates, showLocationSuggestions])
+
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent | TouchEvent) {
+      if (!locationInputGroupRef.current) {
+        return
+      }
+
+      const target = event.target
+
+      if (target instanceof Node && !locationInputGroupRef.current.contains(target)) {
+        setShowLocationSuggestions(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('touchstart', handlePointerDown)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('touchstart', handlePointerDown)
+    }
+  }, [])
+
+  useEffect(() => {
     if (!selectedCoordinates || !mapApiKey) {
       setIsResolvingLocationName(false)
 
@@ -504,6 +690,13 @@ export default function Home() {
     const { latitude, longitude } = selectedCoordinates
     const activeMapApiKey = mapApiKey
     const abortController = new AbortController()
+
+    if (shouldSkipReverseGeocodeRef.current) {
+      shouldSkipReverseGeocodeRef.current = false
+      setIsResolvingLocationName(false)
+      setLocationLookupError(null)
+      return
+    }
 
     async function reverseGeocode() {
       setIsResolvingLocationName(true)
@@ -559,7 +752,7 @@ export default function Home() {
     return () => {
       abortController.abort()
     }
-  }, [selectedCoordinates])
+  }, [selectedCoordinates, mapApiKey])
 
   return (
     <div style={pageStyle}>
@@ -657,17 +850,54 @@ export default function Home() {
 
         <label htmlFor="location_name" style={labelStyle}>
           Место
-          <input
-            id="location_name"
-            type="text"
-            value={locationName}
-            onChange={(e) => {
-              setLocationName(e.target.value)
-              setLocationLookupError(null)
-            }}
-            required
-            style={inputStyle}
-          />
+          <div ref={locationInputGroupRef} style={inputGroupStyle}>
+            <input
+              id="location_name"
+              type="text"
+              value={locationName}
+              onChange={(e) => {
+                setLocationName(e.target.value)
+                setLocationLookupError(null)
+                setShowLocationSuggestions(true)
+              }}
+              onFocus={() => {
+                if (locationName.trim().length >= 3) {
+                  setShowLocationSuggestions(true)
+                }
+              }}
+              autoComplete="off"
+              required
+              style={inputStyle}
+            />
+            {showLocationSuggestions && (isLoadingLocationSuggestions || locationSuggestions.length > 0) && (
+              <ul style={suggestionsListStyle}>
+                {isLoadingLocationSuggestions && (
+                  <li style={suggestionStatusStyle}>Ищем адрес...</li>
+                )}
+                {!isLoadingLocationSuggestions &&
+                  locationSuggestions.map((suggestion, index) => (
+                    <li key={`${suggestion.label}-${suggestion.latitude}-${suggestion.longitude}`}>
+                      <button
+                        type="button"
+                        onPointerDown={(event) => {
+                          event.preventDefault()
+                          selectLocationSuggestion(suggestion)
+                        }}
+                        style={{
+                          ...suggestionButtonStyle,
+                          borderBottom:
+                            index === locationSuggestions.length - 1
+                              ? '0'
+                              : suggestionButtonStyle.borderBottom,
+                        }}
+                      >
+                        {suggestion.label}
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+            )}
+          </div>
           {isResolvingLocationName && (
             <div style={{ ...secondaryTextStyle, marginTop: 6 }}>Определяем адрес по выбранной точке...</div>
           )}
@@ -706,14 +936,8 @@ export default function Home() {
         </div>
 
         <div style={secondaryTextStyle}>
-          Темп указывается в формате минут и секунд на километр. Например: 530 станет 05:30.
+          Выберите точку на карте перед созданием пробежки.
         </div>
-
-        {mapApiKey && !selectedCoordinates && (
-          <div style={{ color: '#b91c1c', fontSize: 14, marginTop: -4 }}>
-            Выберите точку на карте перед созданием пробежки.
-          </div>
-        )}
 
         <div style={primaryButtonRowStyle}>
           <button type="submit" disabled={!session || !isPaceValid || !selectedCoordinates}>
@@ -727,7 +951,7 @@ export default function Home() {
       {runs.map((run) => (
         <div key={run.id} style={cardStyle}>
           <div>
-            <h3 style={{ marginTop: 0, marginBottom: 4 }}>{run.location_name}</h3>
+            <h3 style={{ marginTop: 0, marginBottom: 4 }}>{formatRunLocationName(run.location_name)}</h3>
             <div style={secondaryTextStyle}>{formatRunDateTime(run.time)}</div>
           </div>
 
@@ -753,7 +977,7 @@ export default function Home() {
 
           {run.latitude != null && run.longitude != null && (
             <div style={{ ...secondaryTextStyle, marginBottom: 12 }}>
-              <strong style={{ color: '#0f172a' }}>Точка на карте:</strong> {formatCoordinates(run)} ·{' '}
+              <strong style={{ color: '#0f172a' }}>Адрес:</strong> {formatRunLocationName(run.location_name)} ·{' '}
               <a
                 href={build2GisUrl(run.latitude, run.longitude)}
                 target="_blank"
