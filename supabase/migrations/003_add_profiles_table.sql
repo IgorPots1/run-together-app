@@ -33,11 +33,25 @@ $$;
 
 do $$
 begin
+  if exists (
+    select 1
+    from pg_constraint
+    where conname = 'profiles_id_fkey'
+      and conrelid = 'public.profiles'::regclass
+      and contype = 'f'
+      and confrelid <> 'auth.users'::regclass
+  ) then
+    alter table public.profiles
+      drop constraint profiles_id_fkey;
+  end if;
+
   if not exists (
     select 1
     from pg_constraint
     where conname = 'profiles_id_fkey'
       and conrelid = 'public.profiles'::regclass
+      and contype = 'f'
+      and confrelid = 'auth.users'::regclass
   ) then
     alter table public.profiles
       add constraint profiles_id_fkey
@@ -143,6 +157,7 @@ begin
     insert into public.profiles (id, name)
     select u.id, nullif(btrim(u.name), '')
     from public.users u
+    join auth.users au on au.id = u.id
     on conflict (id) do update
       set name = coalesce(public.profiles.name, excluded.name);
   end if;
