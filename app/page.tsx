@@ -2,99 +2,54 @@
 
 import { useEffect, useState } from 'react'
 
-type Run = {
-  id: string
-  location_name: string
-  time: string
-  duration_minutes: number
-  participants_count: number
-}
-
-const USER_ID = '3ecf99f4-7404-42b8-963c-19a91129574a'
-
 export default function Home() {
-  const [runs, setRuns] = useState<Run[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [joiningRunId, setJoiningRunId] = useState('')
+  const [runs, setRuns] = useState([])
 
-  async function loadRuns() {
+  async function fetchRuns() {
     try {
-      setError('')
-
-      const response = await fetch('/api/runs/list')
-
-      if (!response.ok) {
-        throw new Error('Failed to load runs')
-      }
-
-      const data = await response.json()
+      const res = await fetch('/api/runs/list')
+      const data = await res.json()
       setRuns(data)
-    } catch {
-      setError('Failed to load runs')
-    } finally {
-      setLoading(false)
+    } catch (e) {
+      console.error(e)
     }
+  }
+
+  async function joinRun(runId: string) {
+    await fetch('/api/runs/join', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        run_id: runId,
+        user_id: '3ecf99f4-7404-42b8-963c-19a91129574a',
+      }),
+    })
+
+    fetchRuns()
   }
 
   useEffect(() => {
-    loadRuns()
+    fetchRuns()
   }, [])
 
-  async function handleJoin(runId: string) {
-    try {
-      setJoiningRunId(runId)
-      setError('')
-
-      const response = await fetch('/api/runs/join', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          run_id: runId,
-          user_id: USER_ID,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to join run')
-      }
-
-      await loadRuns()
-    } catch {
-      setError('Failed to join run')
-    } finally {
-      setJoiningRunId('')
-    }
-  }
-
   return (
-    <div>
-      <h1>Runs</h1>
+    <div style={{ padding: 20 }}>
+      <h1>Пробежки</h1>
 
-      {loading ? <div>Loading...</div> : null}
-      {error ? <div>{error}</div> : null}
+      {runs.length === 0 && <div>Нет пробежек</div>}
 
-      {!loading && runs.length === 0 ? <div>No runs found.</div> : null}
+      {runs.map((run: any) => (
+        <div key={run.id} style={{ border: '1px solid #ccc', padding: 10, marginBottom: 10 }}>
+          <div>{run.location_name}</div>
+          <div>{new Date(run.time).toLocaleString()}</div>
+          <div>{run.duration_minutes} мин</div>
+          <div>Участников: {run.participants_count}</div>
 
-      <div>
-        {runs.map((run) => (
-          <div key={run.id}>
-            <div>location_name: {run.location_name}</div>
-            <div>time: {run.time}</div>
-            <div>duration_minutes: {run.duration_minutes}</div>
-            <div>participants_count: {run.participants_count}</div>
-            <button
-              type="button"
-              onClick={() => handleJoin(run.id)}
-              disabled={joiningRunId === run.id}
-            >
-              {joiningRunId === run.id ? 'Joining...' : 'Join'}
-            </button>
-          </div>
-        ))}
-      </div>
+          <button onClick={() => joinRun(run.id)}>
+            Join
+          </button>
+        </div>
+      ))}
     </div>
   )
 }
