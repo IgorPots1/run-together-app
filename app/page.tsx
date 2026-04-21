@@ -39,6 +39,9 @@ type ReverseGeocodeItem = {
   address_name?: string
   building_name?: string
   full_name?: string
+  search_attributes?: {
+    suggested_text?: string
+  }
 }
 
 type GeocodePoint = {
@@ -404,7 +407,11 @@ function buildSuggestionFromItem(item: GeocodeSearchItem): LocationSuggestion | 
     return null
   }
 
-  const label = resolveShortLocation(item)
+  const label =
+    item.search_attributes?.suggested_text ??
+    item.address_name ??
+    item.name ??
+    item.full_name
 
   if (!label) {
     return null
@@ -704,8 +711,9 @@ export default function Home() {
         setIsLoadingLocationSuggestions(true)
 
         try {
-          const url = new URL('https://catalog.api.2gis.com/3.0/items/geocode')
+          const url = new URL('https://catalog.api.2gis.com/3.0/suggests')
           url.searchParams.set('q', trimmedLocationName)
+          url.searchParams.set('suggest_type', 'address')
           url.searchParams.set('fields', 'items.point')
           url.searchParams.set('locale', 'ru_RU')
           url.searchParams.set('limit', '5')
