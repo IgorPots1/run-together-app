@@ -2,7 +2,6 @@ import { supabase } from '@/lib/supabaseClient'
 
 type JoinRunBody = {
   run_id: string
-  user_id: string
 }
 
 export async function POST(request: Request) {
@@ -14,15 +13,33 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { run_id, user_id } = body
+  const authorization = request.headers.get('authorization')
+  const accessToken = authorization?.startsWith('Bearer ')
+    ? authorization.slice('Bearer '.length)
+    : null
 
-  if (!run_id || !user_id) {
-    return Response.json({ error: 'Missing run_id or user_id' }, { status: 400 })
+  if (!accessToken) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser(accessToken)
+
+  if (authError || !user) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { run_id } = body
+
+  if (!run_id) {
+    return Response.json({ error: 'Missing run_id' }, { status: 400 })
   }
 
   const { error } = await supabase.from('run_participants').insert({
     run_id,
-    user_id,
+    user_id: user.id,
   })
 
   if (error && error.code !== '23505') {
