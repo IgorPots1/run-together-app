@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 
+import { AuthSplash } from '@/components/AuthSplash'
 import { getProfileDisplayName, isProfileComplete } from '@/lib/profile'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuthProfile } from '@/lib/useAuthProfile'
@@ -466,6 +467,11 @@ export default function Home() {
     : selectedCoordinates && isLocationNameEmpty
       ? 'Добавьте место вручную или через карту, чтобы создать пробежку.'
       : null
+  const shouldShowSplash =
+    !isBootstrapResolved ||
+    !session ||
+    authProfileStatus === 'profile_loading' ||
+    (authProfileStatus === 'ready' && !hasCompletedProfile)
   const shouldSkipReverseGeocodeRef = useRef(false)
   const locationInputGroupRef = useRef<HTMLDivElement | null>(null)
 
@@ -849,46 +855,8 @@ export default function Home() {
     }
   }, [selectedCoordinates])
 
-  if (authProfileStatus === 'loading') {
-    return (
-      <div style={pageStyle}>
-        <h1 style={{ marginBottom: 8 }}>Пробежки</h1>
-        <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
-          Найдите компанию для пробежки или создайте свою.
-        </p>
-        <div style={{ ...cardStyle, ...secondaryTextStyle }}>Проверяем вход...</div>
-      </div>
-    )
-  }
-
-  if (authProfileStatus === 'signed_out' || !session) {
-    return (
-      <div style={pageStyle}>
-        <h1 style={{ marginBottom: 8 }}>Пробежки</h1>
-        <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
-          Найдите компанию для пробежки или создайте свою.
-        </p>
-        <div style={{ ...cardStyle, ...secondaryTextStyle }}>Перенаправляем на вход...</div>
-      </div>
-    )
-  }
-
-  if (authProfileStatus === 'profile_loading') {
-    return (
-      <div style={pageStyle}>
-        <h1 style={{ marginBottom: 8 }}>Пробежки</h1>
-        <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
-          Найдите компанию для пробежки или создайте свою.
-        </p>
-        <div style={{ ...secondaryTextStyle, marginBottom: 16 }}>
-          Вы вошли как {session.user.email}{' '}
-          <button type="button" onClick={signOut}>
-            Выйти
-          </button>
-        </div>
-        <div style={{ ...cardStyle, ...secondaryTextStyle }}>Загружаем профиль...</div>
-      </div>
-    )
+  if (shouldShowSplash) {
+    return <AuthSplash />
   }
 
   if (authProfileStatus === 'error' && profileError) {

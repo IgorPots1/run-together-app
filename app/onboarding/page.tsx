@@ -3,6 +3,7 @@
 import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { AuthSplash } from '@/components/AuthSplash'
 import {
   isProfileComplete,
   normalizeProfileDraft,
@@ -70,6 +71,11 @@ export default function OnboardingPage() {
   const [isSaving, setIsSaving] = useState(false)
 
   const hasCompletedProfile = isProfileComplete(profile)
+  const shouldShowSplash =
+    !isBootstrapResolved ||
+    !session ||
+    authProfileStatus === 'profile_loading' ||
+    (authProfileStatus === 'ready' && hasCompletedProfile)
 
   useEffect(() => {
     if (isBootstrapResolved && !session) {
@@ -149,6 +155,10 @@ export default function OnboardingPage() {
     router.replace('/')
   }
 
+  if (shouldShowSplash) {
+    return <AuthSplash />
+  }
+
   return (
     <div style={pageStyle}>
       <h1 style={{ marginBottom: 8 }}>Заполните профиль</h1>
@@ -156,25 +166,11 @@ export default function OnboardingPage() {
         После этого можно будет создавать пробежки и присоединяться к другим.
       </p>
 
-      {authProfileStatus === 'loading' && (
-        <div style={{ ...cardStyle, ...secondaryTextStyle }}>Проверяем вход...</div>
-      )}
-
-      {authProfileStatus === 'signed_out' && !session && (
-        <div style={{ ...cardStyle, ...secondaryTextStyle }}>
-          Нужно войти в аккаунт, чтобы продолжить.
-        </div>
-      )}
-
-      {authProfileStatus !== 'loading' && session?.user.email && (
+      {session.user.email && (
         <div style={{ ...secondaryTextStyle, marginBottom: 16 }}>Вы вошли как {session.user.email}</div>
       )}
 
-      {authProfileStatus === 'profile_loading' && session && (
-        <div style={{ ...cardStyle, ...secondaryTextStyle }}>Подготавливаем профиль...</div>
-      )}
-
-      {authProfileStatus === 'error' && session && profileError && (
+      {authProfileStatus === 'error' && profileError && (
         <div style={cardStyle}>
           <div style={{ marginBottom: 8, fontWeight: 600 }}>Не удалось загрузить профиль</div>
           <div style={secondaryTextStyle}>Попробуйте ещё раз.</div>
@@ -186,11 +182,7 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      {authProfileStatus === 'ready' && session && hasCompletedProfile && (
-        <div style={{ ...cardStyle, ...secondaryTextStyle }}>Перенаправляем в приложение...</div>
-      )}
-
-      {authProfileStatus === 'ready' && session && !profileError && !hasCompletedProfile && (
+      {authProfileStatus === 'ready' && !profileError && !hasCompletedProfile && (
         <form key={profile?.updated_at ?? profile?.id ?? 'new-profile'} onSubmit={saveProfile} style={formStyle}>
           <label htmlFor="profile_name" style={labelStyle}>
             Имя

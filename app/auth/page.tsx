@@ -3,6 +3,7 @@
 import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { AuthSplash } from '@/components/AuthSplash'
 import { getAuthCallbackUrl } from '@/lib/appUrl'
 import { isProfileComplete } from '@/lib/profile'
 import { supabase } from '@/lib/supabaseClient'
@@ -84,6 +85,10 @@ export default function AuthPage() {
   const [isSubmittingAuth, setIsSubmittingAuth] = useState(false)
 
   const hasCompletedProfile = isProfileComplete(profile)
+  const shouldShowSplash =
+    authProfileStatus === 'loading' ||
+    authProfileStatus === 'profile_loading' ||
+    (authProfileStatus === 'ready' && !!session)
 
   useEffect(() => {
     if (authProfileStatus === 'ready') {
@@ -194,28 +199,8 @@ export default function AuthPage() {
     }
   }
 
-  if (authProfileStatus === 'loading') {
-    return (
-      <div style={pageStyle}>
-        <h1 style={{ marginBottom: 8 }}>Вход</h1>
-        <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
-          Войдите по email или через Google, чтобы продолжить.
-        </p>
-        <div style={{ ...cardStyle, ...secondaryTextStyle }}>Проверяем вход...</div>
-      </div>
-    )
-  }
-
-  if (authProfileStatus === 'profile_loading') {
-    return (
-      <div style={pageStyle}>
-        <h1 style={{ marginBottom: 8 }}>Вход</h1>
-        <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
-          Войдите по email или через Google, чтобы продолжить.
-        </p>
-        <div style={{ ...cardStyle, ...secondaryTextStyle }}>Подготавливаем профиль...</div>
-      </div>
-    )
+  if (shouldShowSplash) {
+    return <AuthSplash />
   }
 
   if (authProfileStatus === 'error' && session && profileError) {
@@ -233,20 +218,6 @@ export default function AuthPage() {
               Повторить
             </button>
           </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (authProfileStatus === 'ready' && session) {
-    return (
-      <div style={pageStyle}>
-        <h1 style={{ marginBottom: 8 }}>Вход</h1>
-        <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
-          Войдите по email или через Google, чтобы продолжить.
-        </p>
-        <div style={{ ...cardStyle, ...secondaryTextStyle }}>
-          {hasCompletedProfile ? 'Перенаправляем в приложение...' : 'Перенаправляем на заполнение профиля...'}
         </div>
       </div>
     )
