@@ -73,6 +73,10 @@ function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
+function getAuthCallbackUrl(): string {
+  return `${window.location.origin}/auth/callback`
+}
+
 export default function AuthPage() {
   const router = useRouter()
   const { session, isAuthLoading, profile, isProfileLoading, profileError, reloadProfile } = useAuthProfile()
@@ -98,7 +102,7 @@ export default function AuthPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/`,
+        redirectTo: getAuthCallbackUrl(),
       },
     })
 
@@ -175,7 +179,7 @@ export default function AuthPage() {
       email: trimmedEmail,
       password: authPassword,
       options: {
-        emailRedirectTo: `${window.location.origin}/`,
+        emailRedirectTo: getAuthCallbackUrl(),
       },
     })
 
