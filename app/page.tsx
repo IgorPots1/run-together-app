@@ -54,13 +54,50 @@ const inputStyle: CSSProperties = {
 const labelStyle: CSSProperties = {
   display: 'block',
   fontWeight: 600,
-  marginBottom: 12,
+  marginBottom: 0,
 }
 
 const secondaryTextStyle: CSSProperties = {
   color: '#475569',
   fontSize: 14,
 }
+
+const formStyle: CSSProperties = {
+  ...cardStyle,
+  display: 'grid',
+  gap: 14,
+  marginBottom: 20,
+}
+
+const chipListStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 8,
+  marginTop: 10,
+}
+
+const chipStyle: CSSProperties = {
+  border: '1px solid #cbd5e1',
+  borderRadius: 999,
+  padding: '6px 10px',
+  backgroundColor: '#fff',
+  cursor: 'pointer',
+}
+
+const primaryButtonRowStyle: CSSProperties = {
+  marginTop: 4,
+}
+
+const runMetaRowStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 12,
+  marginTop: 12,
+  marginBottom: 12,
+  fontSize: 14,
+}
+
+const paceOptions = ['05:00', '05:30', '06:00', '06:30', '07:00']
 
 function parsePaceInput(value: string): number | null {
   const match = value.trim().match(/^(\d{1,2}):([0-5]\d)$/)
@@ -86,6 +123,51 @@ function formatPace(seconds: number | null): string {
   return `${String(minutesPart).padStart(2, '0')}:${String(secondsPart).padStart(2, '0')} / км`
 }
 
+function normalizePaceInput(value: string): string {
+  const cleanedValue = value.replace(/[^\d:]/g, '')
+
+  if (cleanedValue === '') {
+    return ''
+  }
+
+  if (cleanedValue.includes(':')) {
+    const [minutesPart = '', secondsPart = ''] = cleanedValue.split(':', 2)
+    const minutes = minutesPart.replace(/\D/g, '').slice(0, 2)
+    const seconds = secondsPart.replace(/\D/g, '').slice(0, 2)
+
+    if (cleanedValue.endsWith(':') && seconds === '') {
+      return minutes === '' ? '' : `${minutes}:`
+    }
+
+    return seconds === '' ? minutes : `${minutes}:${seconds}`
+  }
+
+  const digits = cleanedValue.replace(/\D/g, '').slice(0, 4)
+
+  if (digits.length <= 2) {
+    return digits
+  }
+
+  if (digits.length === 3) {
+    return `0${digits[0]}:${digits.slice(1)}`
+  }
+
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`
+}
+
+function finalizePaceInput(value: string): string {
+  const paceSeconds = parsePaceInput(value)
+
+  if (paceSeconds == null) {
+    return value.trim()
+  }
+
+  const minutesPart = Math.floor(paceSeconds / 60)
+  const secondsPart = paceSeconds % 60
+
+  return `${String(minutesPart).padStart(2, '0')}:${String(secondsPart).padStart(2, '0')}`
+}
+
 function formatRunDateTime(value: string): string {
   return new Date(value).toLocaleString('ru-RU')
 }
@@ -106,6 +188,7 @@ export default function Home() {
   const [pace, setPace] = useState('')
   const [locationName, setLocationName] = useState('')
   const isPaceValid = pace === '' || parsePaceInput(pace) !== null
+  const selectedPace = parsePaceInput(pace) == null ? pace : finalizePaceInput(pace)
 
   async function fetchRuns() {
     try {
@@ -308,7 +391,7 @@ export default function Home() {
         </div>
       )}
 
-      <form onSubmit={createRun} style={{ ...cardStyle, marginBottom: 20 }}>
+      <form onSubmit={createRun} style={formStyle}>
         <h2 style={{ marginTop: 0, marginBottom: 16 }}>Создать пробежку</h2>
 
         <label htmlFor="time" style={labelStyle}>
@@ -345,11 +428,28 @@ export default function Home() {
             inputMode="numeric"
             placeholder="05:30"
             value={pace}
-            onChange={(e) => setPace(e.target.value)}
+            onChange={(e) => setPace(normalizePaceInput(e.target.value))}
+            onBlur={(e) => setPace(finalizePaceInput(e.target.value))}
             required
             aria-invalid={!isPaceValid}
             style={inputStyle}
           />
+          <div style={chipListStyle}>
+            {paceOptions.map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setPace(option)}
+                style={{
+                  ...chipStyle,
+                  borderColor: selectedPace === option ? '#2563eb' : '#cbd5e1',
+                  backgroundColor: selectedPace === option ? '#eff6ff' : chipStyle.backgroundColor,
+                }}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
         </label>
 
         {!isPaceValid && (
@@ -370,9 +470,11 @@ export default function Home() {
           />
         </label>
 
-        <div style={secondaryTextStyle}>Темп указывается в формате минут и секунд на километр.</div>
+        <div style={secondaryTextStyle}>
+          Темп указывается в формате минут и секунд на километр. Например: 530 станет 05:30.
+        </div>
 
-        <div style={{ marginTop: 16 }}>
+        <div style={primaryButtonRowStyle}>
           <button type="submit" disabled={!session || !isPaceValid}>
             Создать пробежку
           </button>
@@ -383,25 +485,29 @@ export default function Home() {
 
       {runs.map((run) => (
         <div key={run.id} style={cardStyle}>
-          <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
-            <div>
-              <strong>Место:</strong> {run.location_name}
-            </div>
-            <div>
-              <strong>Дата и время:</strong> {formatRunDateTime(run.time)}
-            </div>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 4 }}>{run.location_name}</h3>
+            <div style={secondaryTextStyle}>{formatRunDateTime(run.time)}</div>
+          </div>
+
+          <div style={runMetaRowStyle}>
             <div>
               <strong>Длительность:</strong> {run.duration_minutes ?? 'Не указана'} мин
             </div>
             <div>
               <strong>Темп:</strong> {formatPace(run.pace_sec_per_km)}
             </div>
-            <div>
-              <strong>Создал:</strong> {formatCreatorName(run)}
-            </div>
-            <div>
-              <strong>Участники:</strong> {run.participants_count}
-            </div>
+          </div>
+
+          <div style={{ ...secondaryTextStyle, marginBottom: 6 }}>
+            <strong style={{ color: '#0f172a' }}>Создал:</strong> {formatCreatorName(run)}
+          </div>
+
+          <div style={{ ...secondaryTextStyle, marginBottom: 12 }}>
+            <strong style={{ color: '#0f172a' }}>Участники:</strong> {run.participants_count}
+            {run.participants.length > 0
+              ? ` · ${run.participants.map((participant) => formatParticipantName(participant)).join(', ')}`
+              : ' · Пока никто не присоединился'}
           </div>
 
           {run.last_joined_user_name && (
@@ -416,21 +522,11 @@ export default function Home() {
             </div>
           )}
 
-          <div style={{ fontWeight: 600, marginBottom: 8 }}>Список участников</div>
-          {run.participants.length > 0 && (
-            <ul style={{ marginTop: 0, paddingLeft: 20 }}>
-              {run.participants.map((participant) => (
-                <li key={participant.id}>{formatParticipantName(participant)}</li>
-              ))}
-            </ul>
-          )}
-          {run.participants.length === 0 && (
-            <div style={{ ...secondaryTextStyle, marginBottom: 12 }}>Пока никто не присоединился</div>
-          )}
-
-          <button type="button" onClick={() => joinRun(run.id)} disabled={!session}>
-            Присоединиться
-          </button>
+          <div style={{ marginTop: 16 }}>
+            <button type="button" onClick={() => joinRun(run.id)} disabled={!session}>
+              Присоединиться
+            </button>
+          </div>
         </div>
       ))}
     </div>
