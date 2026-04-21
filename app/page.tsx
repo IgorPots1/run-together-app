@@ -129,7 +129,21 @@ export default function Home() {
           <div>{run.location_name}</div>
           <div>{new Date(run.time).toLocaleString()}</div>
           <div>{run.duration_minutes} мин</div>
+          <div>Создатель: {run.creator_name ?? run.creator_id}</div>
           <div>Участников: {run.participants_count}</div>
+          <div>
+            Участники:
+            {run.participants.length === 0 && ' Нет участников'}
+          </div>
+          {run.participants.length > 0 && (
+            <ul>
+              {run.participants.map((participant: any) => (
+                <li key={participant.id}>
+                  {participant.name ?? participant.id}
+                </li>
+              ))}
+            </ul>
+          )}
 
           <button onClick={() => joinRun(run.id)}>
             Join
