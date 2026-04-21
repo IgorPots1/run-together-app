@@ -6,7 +6,7 @@ export async function GET() {
   const { data: runs, error } = await supabase
     .from('runs')
     .select(
-      'id, creator_id, time, duration_minutes, distance_km, pace_sec_per_km, location_name, lat, lng, created_at, run_participants(user_id, created_at)'
+      'id, creator_id, time, duration_minutes, distance_km, pace_sec_per_km, location_name, latitude, longitude, created_at, run_participants(user_id, created_at)'
     )
     .gt('time', now)
     .order('time', { ascending: true })
@@ -68,8 +68,8 @@ export async function GET() {
         distance_km: run.distance_km,
         pace_sec_per_km: run.pace_sec_per_km,
         location_name: run.location_name,
-        lat: run.lat,
-        lng: run.lng,
+        latitude: run.latitude,
+        longitude: run.longitude,
         created_at: run.created_at,
         participants: (run.run_participants ?? []).map((participant) => ({
           id: participant.user_id,

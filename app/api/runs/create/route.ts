@@ -6,8 +6,10 @@ type CreateRunBody = {
   distance_km?: number
   pace_sec_per_km?: number
   location_name: string
-  lat: number
-  lng: number
+  latitude?: number | null
+  longitude?: number | null
+  lat?: number | null
+  lng?: number | null
 }
 
 export async function POST(request: Request) {
@@ -46,6 +48,18 @@ export async function POST(request: Request) {
     lat,
     lng,
   } = body
+  const latitude =
+    typeof body.latitude === 'number'
+      ? body.latitude
+      : typeof lat === 'number'
+        ? lat
+        : null
+  const longitude =
+    typeof body.longitude === 'number'
+      ? body.longitude
+      : typeof lng === 'number'
+        ? lng
+        : null
 
   if (duration_minutes == null && distance_km == null) {
     return Response.json(
@@ -57,8 +71,10 @@ export async function POST(request: Request) {
   if (
     !time ||
     !location_name ||
-    typeof lat !== 'number' ||
-    typeof lng !== 'number'
+    latitude == null ||
+    longitude == null ||
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude)
   ) {
     return Response.json({ error: 'Missing required fields' }, { status: 400 })
   }
@@ -72,8 +88,8 @@ export async function POST(request: Request) {
       distance_km,
       pace_sec_per_km,
       location_name,
-      lat,
-      lng,
+      latitude,
+      longitude,
     })
     .select()
     .single()

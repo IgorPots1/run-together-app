@@ -1,5 +1,6 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
 
@@ -19,13 +20,18 @@ type Run = {
   distance_km: number | null
   pace_sec_per_km: number | null
   location_name: string
-  lat: number
-  lng: number
+  latitude: number | null
+  longitude: number | null
   created_at: string
   participants: Participant[]
   participants_count: number
   last_joined_user_name: string | null
   last_joined_at: string | null
+}
+
+type RunCoordinates = {
+  latitude: number
+  longitude: number
 }
 
 const pageStyle: CSSProperties = {
@@ -97,7 +103,17 @@ const runMetaRowStyle: CSSProperties = {
   fontSize: 14,
 }
 
+const mapActionLinkStyle: CSSProperties = {
+  color: '#2563eb',
+  textDecoration: 'none',
+  fontWeight: 600,
+}
+
 const paceOptions = ['05:00', '05:30', '06:00', '06:30', '07:00']
+const mapApiKey = process.env.NEXT_PUBLIC_2GIS_MAP_KEY
+const RunLocationPicker = dynamic(() => import('@/components/RunLocationPicker'), {
+  ssr: false,
+})
 
 function parsePaceInput(value: string): number | null {
   const match = value.trim().match(/^(\d{1,2}):([0-5]\d)$/)
@@ -180,6 +196,18 @@ function formatParticipantName(participant: Participant): string {
   return participant.name ?? 'Участник'
 }
 
+function formatCoordinates(run: Pick<Run, 'latitude' | 'longitude'>): string {
+  if (run.latitude == null || run.longitude == null) {
+    return 'Точка на карте не указана'
+  }
+
+  return `${run.latitude.toFixed(5)}, ${run.longitude.toFixed(5)}`
+}
+
+function build2GisUrl(latitude: number, longitude: number): string {
+  return `https://2gis.ru/geo/${longitude},${latitude}`
+}
+
 export default function Home() {
   const [runs, setRuns] = useState<Run[]>([])
   const [session, setSession] = useState<Session | null>(null)
@@ -187,6 +215,7 @@ export default function Home() {
   const [durationMinutes, setDurationMinutes] = useState('')
   const [pace, setPace] = useState('')
   const [locationName, setLocationName] = useState('')
+  const [selectedCoordinates, setSelectedCoordinates] = useState<RunCoordinates | null>(null)
   const isPaceValid = pace === '' || parsePaceInput(pace) !== null
   const selectedPace = parsePaceInput(pace) == null ? pace : finalizePaceInput(pace)
 
@@ -274,7 +303,7 @@ export default function Home() {
 
     const paceSecPerKm = parsePaceInput(pace)
 
-    if (paceSecPerKm == null) {
+    if (paceSecPerKm == null || selectedCoordinates == null) {
       return
     }
 
@@ -290,8 +319,8 @@ export default function Home() {
           duration_minutes: Number(durationMinutes),
           pace_sec_per_km: paceSecPerKm,
           location_name: locationName,
-          lat: 0,
-          lng: 0,
+          latitude: selectedCoordinates.latitude,
+          longitude: selectedCoordinates.longitude,
         }),
       })
 
@@ -303,6 +332,7 @@ export default function Home() {
       setDurationMinutes('')
       setPace('')
       setLocationName('')
+      setSelectedCoordinates(null)
       fetchRuns()
     } catch (e) {
       console.error(e)
@@ -470,12 +500,39 @@ export default function Home() {
           />
         </label>
 
+        <div>
+          <div style={{ ...labelStyle, marginBottom: 8 }}>Точка на карте</div>
+          <RunLocationPicker
+            apiKey={mapApiKey}
+            value={selectedCoordinates}
+            onChange={setSelectedCoordinates}
+          />
+          <div style={{ ...secondaryTextStyle, marginTop: 8 }}>
+            {selectedCoordinates
+              ? `Выбрано: ${selectedCoordinates.latitude.toFixed(5)}, ${selectedCoordinates.longitude.toFixed(5)}`
+              : 'Выберите одну точку на карте.'}
+          </div>
+          {selectedCoordinates && (
+            <div style={{ marginTop: 8 }}>
+              <button type="button" onClick={() => setSelectedCoordinates(null)}>
+                Очистить точку
+              </button>
+            </div>
+          )}
+        </div>
+
         <div style={secondaryTextStyle}>
           Темп указывается в формате минут и секунд на километр. Например: 530 станет 05:30.
         </div>
 
+        {mapApiKey && !selectedCoordinates && (
+          <div style={{ color: '#b91c1c', fontSize: 14, marginTop: -4 }}>
+            Выберите точку на карте перед созданием пробежки.
+          </div>
+        )}
+
         <div style={primaryButtonRowStyle}>
-          <button type="submit" disabled={!session || !isPaceValid}>
+          <button type="submit" disabled={!session || !isPaceValid || !selectedCoordinates}>
             Создать пробежку
           </button>
         </div>
@@ -509,6 +566,20 @@ export default function Home() {
               ? ` · ${run.participants.map((participant) => formatParticipantName(participant)).join(', ')}`
               : ' · Пока никто не присоединился'}
           </div>
+
+          {run.latitude != null && run.longitude != null && (
+            <div style={{ ...secondaryTextStyle, marginBottom: 12 }}>
+              <strong style={{ color: '#0f172a' }}>Точка на карте:</strong> {formatCoordinates(run)} ·{' '}
+              <a
+                href={build2GisUrl(run.latitude, run.longitude)}
+                target="_blank"
+                rel="noreferrer"
+                style={mapActionLinkStyle}
+              >
+                Открыть на карте
+              </a>
+            </div>
+          )}
 
           {run.last_joined_user_name && (
             <div style={{ ...secondaryTextStyle, marginBottom: 12 }}>
