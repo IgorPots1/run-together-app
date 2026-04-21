@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
 
 import { supabase } from '@/lib/supabaseClient'
@@ -28,13 +28,84 @@ type Run = {
   last_joined_at: string | null
 }
 
+const pageStyle: CSSProperties = {
+  maxWidth: 720,
+  margin: '0 auto',
+  padding: 20,
+}
+
+const cardStyle: CSSProperties = {
+  border: '1px solid #d1d5db',
+  borderRadius: 12,
+  padding: 16,
+  marginBottom: 12,
+  backgroundColor: '#fff',
+}
+
+const inputStyle: CSSProperties = {
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '10px 12px',
+  border: '1px solid #cbd5e1',
+  borderRadius: 8,
+  marginTop: 6,
+}
+
+const labelStyle: CSSProperties = {
+  display: 'block',
+  fontWeight: 600,
+  marginBottom: 12,
+}
+
+const secondaryTextStyle: CSSProperties = {
+  color: '#475569',
+  fontSize: 14,
+}
+
+function parsePaceInput(value: string): number | null {
+  const match = value.trim().match(/^(\d{1,2}):([0-5]\d)$/)
+
+  if (!match) {
+    return null
+  }
+
+  const minutes = Number(match[1])
+  const seconds = Number(match[2])
+
+  return minutes * 60 + seconds
+}
+
+function formatPace(seconds: number | null): string {
+  if (seconds == null) {
+    return 'Не указан'
+  }
+
+  const minutesPart = Math.floor(seconds / 60)
+  const secondsPart = seconds % 60
+
+  return `${String(minutesPart).padStart(2, '0')}:${String(secondsPart).padStart(2, '0')} / км`
+}
+
+function formatRunDateTime(value: string): string {
+  return new Date(value).toLocaleString('ru-RU')
+}
+
+function formatCreatorName(run: Run): string {
+  return run.creator_name ?? 'Пользователь'
+}
+
+function formatParticipantName(participant: Participant): string {
+  return participant.name ?? 'Участник'
+}
+
 export default function Home() {
   const [runs, setRuns] = useState<Run[]>([])
   const [session, setSession] = useState<Session | null>(null)
   const [time, setTime] = useState('')
   const [durationMinutes, setDurationMinutes] = useState('')
-  const [paceSecPerKm, setPaceSecPerKm] = useState('')
+  const [pace, setPace] = useState('')
   const [locationName, setLocationName] = useState('')
+  const isPaceValid = pace === '' || parsePaceInput(pace) !== null
 
   async function fetchRuns() {
     try {
@@ -118,6 +189,12 @@ export default function Home() {
       return
     }
 
+    const paceSecPerKm = parsePaceInput(pace)
+
+    if (paceSecPerKm == null) {
+      return
+    }
+
     try {
       const res = await fetch('/api/runs/create', {
         method: 'POST',
@@ -128,7 +205,7 @@ export default function Home() {
         body: JSON.stringify({
           time: new Date(time).toISOString(),
           duration_minutes: Number(durationMinutes),
-          pace_sec_per_km: Number(paceSecPerKm),
+          pace_sec_per_km: paceSecPerKm,
           location_name: locationName,
           lat: 0,
           lng: 0,
@@ -141,7 +218,7 @@ export default function Home() {
 
       setTime('')
       setDurationMinutes('')
-      setPaceSecPerKm('')
+      setPace('')
       setLocationName('')
       fetchRuns()
     } catch (e) {
@@ -205,106 +282,154 @@ export default function Home() {
   }
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1>Пробежки</h1>
+    <div style={pageStyle}>
+      <h1 style={{ marginBottom: 8 }}>Пробежки</h1>
+      <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
+        Найдите компанию для пробежки или создайте свою.
+      </p>
 
       {!session && (
         <div style={{ marginBottom: 16 }}>
           <button type="button" onClick={signInWithGoogle}>
-            Login with Google
+            Войти через Google
           </button>
         </div>
       )}
 
       {session?.user.email && (
-        <div style={{ marginBottom: 16 }}>
-          Logged in as {session.user.email}
+        <div style={{ ...secondaryTextStyle, marginBottom: 16 }}>
+          Вы вошли как {session.user.email}
         </div>
       )}
 
-      <form onSubmit={createRun}>
-        <div>
-          <label htmlFor="time">time</label>
+      {!session && (
+        <div style={{ ...cardStyle, ...secondaryTextStyle }}>
+          Чтобы создать пробежку или присоединиться, войдите через Google.
         </div>
-        <input
-          id="time"
-          type="datetime-local"
-          value={time}
-          onChange={(e) => setTime(e.target.value)}
-          required
-        />
+      )}
 
-        <div>
-          <label htmlFor="duration_minutes">duration_minutes</label>
-        </div>
-        <input
-          id="duration_minutes"
-          type="number"
-          value={durationMinutes}
-          onChange={(e) => setDurationMinutes(e.target.value)}
-          required
-        />
+      <form onSubmit={createRun} style={{ ...cardStyle, marginBottom: 20 }}>
+        <h2 style={{ marginTop: 0, marginBottom: 16 }}>Создать пробежку</h2>
 
-        <div>
-          <label htmlFor="pace_sec_per_km">pace_sec_per_km</label>
-        </div>
-        <input
-          id="pace_sec_per_km"
-          type="number"
-          value={paceSecPerKm}
-          onChange={(e) => setPaceSecPerKm(e.target.value)}
-          required
-        />
+        <label htmlFor="time" style={labelStyle}>
+          Дата и время
+          <input
+            id="time"
+            type="datetime-local"
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+            required
+            style={inputStyle}
+          />
+        </label>
 
-        <div>
-          <label htmlFor="location_name">location_name</label>
-        </div>
-        <input
-          id="location_name"
-          type="text"
-          value={locationName}
-          onChange={(e) => setLocationName(e.target.value)}
-          required
-        />
+        <label htmlFor="duration_minutes" style={labelStyle}>
+          Длительность (мин)
+          <input
+            id="duration_minutes"
+            type="number"
+            min="1"
+            step="1"
+            value={durationMinutes}
+            onChange={(e) => setDurationMinutes(e.target.value)}
+            required
+            style={inputStyle}
+          />
+        </label>
 
-        <div>
-          <button type="submit" disabled={!session}>
-            Create run
+        <label htmlFor="pace" style={labelStyle}>
+          Темп
+          <input
+            id="pace"
+            type="text"
+            inputMode="numeric"
+            placeholder="05:30"
+            value={pace}
+            onChange={(e) => setPace(e.target.value)}
+            required
+            aria-invalid={!isPaceValid}
+            style={inputStyle}
+          />
+        </label>
+
+        {!isPaceValid && (
+          <div style={{ color: '#b91c1c', fontSize: 14, marginTop: -4, marginBottom: 12 }}>
+            Введите темп в формате мм:сс, например 05:30.
+          </div>
+        )}
+
+        <label htmlFor="location_name" style={labelStyle}>
+          Место
+          <input
+            id="location_name"
+            type="text"
+            value={locationName}
+            onChange={(e) => setLocationName(e.target.value)}
+            required
+            style={inputStyle}
+          />
+        </label>
+
+        <div style={secondaryTextStyle}>Темп указывается в формате минут и секунд на километр.</div>
+
+        <div style={{ marginTop: 16 }}>
+          <button type="submit" disabled={!session || !isPaceValid}>
+            Создать пробежку
           </button>
         </div>
       </form>
 
-      {runs.length === 0 && <div>Нет пробежек</div>}
+      {runs.length === 0 && <div style={cardStyle}>Пока нет пробежек</div>}
 
       {runs.map((run) => (
-        <div key={run.id} style={{ border: '1px solid #ccc', padding: 10, marginBottom: 10 }}>
-          <div>{run.location_name}</div>
-          <div>{new Date(run.time).toLocaleString()}</div>
-          <div>{run.duration_minutes} мин</div>
-          <div>Создатель: {run.creator_name ?? run.creator_id}</div>
-          <div>Участников: {run.participants_count}</div>
-          {run.last_joined_user_name && (
-            <div>Last joined: {run.last_joined_user_name}</div>
-          )}
-          {!run.last_joined_user_name && run.last_joined_at && (
-            <div>+1 participant recently</div>
-          )}
-          <div>
-            Участники:
-            {run.participants.length === 0 && ' Нет участников'}
+        <div key={run.id} style={cardStyle}>
+          <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
+            <div>
+              <strong>Место:</strong> {run.location_name}
+            </div>
+            <div>
+              <strong>Дата и время:</strong> {formatRunDateTime(run.time)}
+            </div>
+            <div>
+              <strong>Длительность:</strong> {run.duration_minutes ?? 'Не указана'} мин
+            </div>
+            <div>
+              <strong>Темп:</strong> {formatPace(run.pace_sec_per_km)}
+            </div>
+            <div>
+              <strong>Создал:</strong> {formatCreatorName(run)}
+            </div>
+            <div>
+              <strong>Участники:</strong> {run.participants_count}
+            </div>
           </div>
+
+          {run.last_joined_user_name && (
+            <div style={{ ...secondaryTextStyle, marginBottom: 12 }}>
+              Недавно присоединился: {run.last_joined_user_name}
+            </div>
+          )}
+
+          {!run.last_joined_user_name && run.last_joined_at && (
+            <div style={{ ...secondaryTextStyle, marginBottom: 12 }}>
+              Недавно присоединился ещё один участник
+            </div>
+          )}
+
+          <div style={{ fontWeight: 600, marginBottom: 8 }}>Список участников</div>
           {run.participants.length > 0 && (
-            <ul>
+            <ul style={{ marginTop: 0, paddingLeft: 20 }}>
               {run.participants.map((participant) => (
-                <li key={participant.id}>
-                  {participant.name ?? participant.id}
-                </li>
+                <li key={participant.id}>{formatParticipantName(participant)}</li>
               ))}
             </ul>
           )}
+          {run.participants.length === 0 && (
+            <div style={{ ...secondaryTextStyle, marginBottom: 12 }}>Пока никто не присоединился</div>
+          )}
 
-          <button onClick={() => joinRun(run.id)} disabled={!session}>
-            Join
+          <button type="button" onClick={() => joinRun(run.id)} disabled={!session}>
+            Присоединиться
           </button>
         </div>
       ))}
