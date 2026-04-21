@@ -347,6 +347,10 @@ export default function Home() {
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false)
   const isPaceValid = pace === '' || parsePaceInput(pace) !== null
   const selectedPace = parsePaceInput(pace) == null ? pace : finalizePaceInput(pace)
+  const trimmedLocationName = locationName.trim()
+  const isLocationNameEmpty = trimmedLocationName === ''
+  const isSubmitDisabled =
+    !session || !isPaceValid || !selectedCoordinates || isLocationNameEmpty || isResolvingLocationName
   const shouldSkipReverseGeocodeRef = useRef(false)
   const locationInputGroupRef = useRef<HTMLDivElement | null>(null)
 
@@ -726,7 +730,6 @@ export default function Home() {
         const resolvedLocation = resolveShortLocation(data.result?.items?.[0] ?? {})
 
         if (!resolvedLocation) {
-          setLocationName('')
           setLocationLookupError('Не удалось определить адрес. Укажите место вручную.')
           return
         }
@@ -738,7 +741,6 @@ export default function Home() {
         }
 
         console.error(error)
-        setLocationName('')
         setLocationLookupError('Не удалось определить адрес. Укажите место вручную.')
       } finally {
         if (!abortController.signal.aborted) {
@@ -898,6 +900,11 @@ export default function Home() {
               </ul>
             )}
           </div>
+          {(isLocationNameEmpty || isResolvingLocationName) && (
+            <div style={{ ...secondaryTextStyle, marginTop: 6 }}>
+              Укажите место или дождитесь определения адреса
+            </div>
+          )}
           {isResolvingLocationName && (
             <div style={{ ...secondaryTextStyle, marginTop: 6 }}>Определяем адрес по выбранной точке...</div>
           )}
@@ -920,7 +927,9 @@ export default function Home() {
           </div>
           <div style={{ ...secondaryTextStyle, marginTop: 8 }}>
             {selectedCoordinates
-              ? `Выбрано: ${selectedCoordinates.latitude.toFixed(5)}, ${selectedCoordinates.longitude.toFixed(5)}`
+              ? trimmedLocationName !== ''
+                ? `Выбрано: ${trimmedLocationName}`
+                : `Выбрано: ${selectedCoordinates.latitude.toFixed(5)}, ${selectedCoordinates.longitude.toFixed(5)}`
               : 'Выберите одну точку на карте.'}
           </div>
           {geolocationError && (
@@ -940,7 +949,7 @@ export default function Home() {
         </div>
 
         <div style={primaryButtonRowStyle}>
-          <button type="submit" disabled={!session || !isPaceValid || !selectedCoordinates}>
+          <button type="submit" disabled={isSubmitDisabled}>
             Создать пробежку
           </button>
         </div>
