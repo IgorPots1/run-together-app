@@ -6,6 +6,7 @@ declare
   runs_creator_confupdtype "char";
   runs_orphan_count bigint;
   runs_orphan_sample_ids uuid[];
+  runs_orphan_sample_creator_ids uuid[];
 
   run_participants_user_constraint_name text;
   run_participants_user_constraint_target regclass;
@@ -13,13 +14,51 @@ declare
   run_participants_user_confupdtype "char";
   run_participants_orphan_count bigint;
   run_participants_orphan_sample_keys text[];
+  run_participants_orphan_sample_user_ids uuid[];
 begin
+  if (
+    exists (
+      select 1
+      from information_schema.tables
+      where table_schema = 'public'
+        and table_name in ('runs', 'run_participants')
+    )
+    and not exists (
+      select 1
+      from information_schema.tables
+      where table_schema = 'public'
+        and table_name = 'profiles'
+    )
+  ) then
+    raise exception using
+      message = 'Cannot repoint run foreign keys to public.profiles(id): public.profiles does not exist.';
+  end if;
+
   if exists (
     select 1
     from information_schema.tables
     where table_schema = 'public'
       and table_name = 'runs'
   ) then
+    insert into public.profiles (id, name)
+    select distinct
+      au.id,
+      nullif(
+        btrim(
+          coalesce(
+            au.raw_user_meta_data ->> 'name',
+            au.raw_user_meta_data ->> 'full_name'
+          )
+        ),
+        ''
+      )
+    from public.runs r
+    join auth.users au on au.id = r.creator_id
+    left join public.profiles p on p.id = au.id
+    where r.creator_id is not null
+      and p.id is null
+    on conflict (id) do nothing;
+
     select count(*)
       into runs_orphan_count
     from public.runs r
@@ -27,10 +66,13 @@ begin
     where r.creator_id is not null
       and p.id is null;
 
-    select coalesce(array_agg(run_id order by run_id), '{}'::uuid[])
+    select coalesce(array_agg(run_id order by run_id), '{}'::uuid[]),
+           coalesce(array_agg(creator_id order by creator_id), '{}'::uuid[])
       into runs_orphan_sample_ids
+         , runs_orphan_sample_creator_ids
     from (
-      select r.id as run_id
+      select r.id as run_id,
+             r.creator_id
       from public.runs r
       left join public.profiles p on p.id = r.creator_id
       where r.creator_id is not null
@@ -42,9 +84,10 @@ begin
     if runs_orphan_count > 0 then
       raise exception using
         message = format(
-          'Cannot repoint public.runs.creator_id to public.profiles(id): %s row(s) reference creator_id values with no matching profile. Sample run ids: %s',
+          'Cannot repoint public.runs.creator_id to public.profiles(id): %s row(s) still reference creator_id values with no matching profile after backfilling from auth.users. Sample run ids: %s. Sample missing creator_id values: %s',
           runs_orphan_count,
-          array_to_string(runs_orphan_sample_ids, ', ')
+          array_to_string(runs_orphan_sample_ids, ', '),
+          array_to_string(runs_orphan_sample_creator_ids, ', ')
         );
     end if;
 
@@ -100,6 +143,25 @@ begin
     where table_schema = 'public'
       and table_name = 'run_participants'
   ) then
+    insert into public.profiles (id, name)
+    select distinct
+      au.id,
+      nullif(
+        btrim(
+          coalesce(
+            au.raw_user_meta_data ->> 'name',
+            au.raw_user_meta_data ->> 'full_name'
+          )
+        ),
+        ''
+      )
+    from public.run_participants rp
+    join auth.users au on au.id = rp.user_id
+    left join public.profiles p on p.id = au.id
+    where rp.user_id is not null
+      and p.id is null
+    on conflict (id) do nothing;
+
     select count(*)
       into run_participants_orphan_count
     from public.run_participants rp
@@ -107,10 +169,13 @@ begin
     where rp.user_id is not null
       and p.id is null;
 
-    select coalesce(array_agg(sample_key order by sample_key), '{}'::text[])
+    select coalesce(array_agg(sample_key order by sample_key), '{}'::text[]),
+           coalesce(array_agg(user_id order by user_id), '{}'::uuid[])
       into run_participants_orphan_sample_keys
+         , run_participants_orphan_sample_user_ids
     from (
-      select format('%s:%s', rp.run_id, rp.user_id) as sample_key
+      select format('%s:%s', rp.run_id, rp.user_id) as sample_key,
+             rp.user_id
       from public.run_participants rp
       left join public.profiles p on p.id = rp.user_id
       where rp.user_id is not null
@@ -122,9 +187,10 @@ begin
     if run_participants_orphan_count > 0 then
       raise exception using
         message = format(
-          'Cannot repoint public.run_participants.user_id to public.profiles(id): %s row(s) reference user_id values with no matching profile. Sample run_id:user_id pairs: %s',
+          'Cannot repoint public.run_participants.user_id to public.profiles(id): %s row(s) still reference user_id values with no matching profile after backfilling from auth.users. Sample run_id:user_id pairs: %s. Sample missing user_id values: %s',
           run_participants_orphan_count,
-          array_to_string(run_participants_orphan_sample_keys, ', ')
+          array_to_string(run_participants_orphan_sample_keys, ', '),
+          array_to_string(run_participants_orphan_sample_user_ids, ', ')
         );
     end if;
 
