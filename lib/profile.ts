@@ -14,6 +14,13 @@ export type Profile = {
   gender: ProfileGender | null
 }
 
+export type ProfileDraft = {
+  name: string
+  nickname: string
+  city: string
+  gender: ProfileGender | ''
+}
+
 type ProfileLike = Pick<Profile, 'name' | 'nickname' | 'city' | 'gender'>
 
 export function normalizeProfileText(value: string | null | undefined): string {
@@ -22,6 +29,37 @@ export function normalizeProfileText(value: string | null | undefined): string {
 
 export function isProfileGender(value: string | null | undefined): value is ProfileGender {
   return profileGenders.includes(value as ProfileGender)
+}
+
+export function normalizeProfileDraft(draft: ProfileDraft): ProfileDraft {
+  return {
+    name: normalizeProfileText(draft.name),
+    nickname: normalizeProfileText(draft.nickname),
+    city: normalizeProfileText(draft.city),
+    gender: isProfileGender(draft.gender) ? draft.gender : '',
+  }
+}
+
+export function validateProfileDraft(draft: ProfileDraft): string | null {
+  const normalizedDraft = normalizeProfileDraft(draft)
+
+  if (normalizedDraft.name === '') {
+    return 'Укажите имя.'
+  }
+
+  if (normalizedDraft.nickname === '') {
+    return 'Укажите никнейм.'
+  }
+
+  if (normalizedDraft.city === '') {
+    return 'Укажите город.'
+  }
+
+  if (!isProfileGender(normalizedDraft.gender)) {
+    return 'Выберите пол.'
+  }
+
+  return null
 }
 
 export function isProfileComplete(profile: Partial<ProfileLike> | null | undefined): boolean {

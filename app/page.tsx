@@ -1,19 +1,12 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
-import type { Session } from '@supabase/supabase-js'
 
-import {
-  getProfileDisplayName,
-  isProfileComplete,
-  normalizeProfileText,
-  profileGenders,
-  profileSelect,
-  type Profile,
-  type ProfileGender,
-} from '@/lib/profile'
+import { getProfileDisplayName, isProfileComplete } from '@/lib/profile'
 import { supabase } from '@/lib/supabaseClient'
+import { useAuthProfile } from '@/lib/useAuthProfile'
 
 type Participant = {
   id: string
@@ -42,8 +35,6 @@ type RunCoordinates = {
   latitude: number
   longitude: number
 }
-
-type ProfileFormGender = ProfileGender | ''
 
 type ReverseGeocodeItem = {
   name?: string
@@ -194,11 +185,6 @@ const mapActionLinkStyle: CSSProperties = {
 }
 
 const paceOptions = ['05:00', '05:30', '06:00', '06:30', '07:00']
-const genderLabels: Record<ProfileGender, string> = {
-  male: 'Мужской',
-  female: 'Женский',
-  prefer_not_to_say: 'Предпочитаю не указывать',
-}
 const mapApiKey = process.env.NEXT_PUBLIC_2GIS_MAP_KEY
 const runnerFriendlyLocationPatterns = [
   /\bулиц/i,
@@ -446,20 +432,41 @@ function formatRunLocationName(locationName: string): string {
   return normalizedLocationName === '' ? 'Точка на карте выбрана' : normalizedLocationName
 }
 
+function getAuthErrorMessage(message: string, fallbackMessage: string): string {
+  const normalizedMessage = message.toLowerCase()
+
+  if (normalizedMessage.includes('invalid login credentials')) {
+    return 'Неверный email или пароль.'
+  }
+
+  if (normalizedMessage.includes('email not confirmed')) {
+    return 'Подтвердите email по ссылке из письма и войдите снова.'
+  }
+
+  if (normalizedMessage.includes('user already registered')) {
+    return 'Этот email уже зарегистрирован. Попробуйте войти.'
+  }
+
+  if (normalizedMessage.includes('password should be at least')) {
+    return 'Пароль должен быть не короче 6 символов.'
+  }
+
+  return fallbackMessage
+}
+
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
 export default function Home() {
+  const router = useRouter()
+  const { session, isAuthLoading, profile, isProfileLoading, profileError, reloadProfile } = useAuthProfile()
   const [runs, setRuns] = useState<Run[]>([])
-  const [session, setSession] = useState<Session | null>(null)
-  const [isAuthLoading, setIsAuthLoading] = useState(true)
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [isProfileLoading, setIsProfileLoading] = useState(false)
-  const [profileError, setProfileError] = useState<string | null>(null)
-  const [profileReloadToken, setProfileReloadToken] = useState(0)
-  const [profileName, setProfileName] = useState('')
-  const [profileNickname, setProfileNickname] = useState('')
-  const [profileCity, setProfileCity] = useState('')
-  const [profileGender, setProfileGender] = useState<ProfileFormGender>('')
-  const [profileSubmitError, setProfileSubmitError] = useState<string | null>(null)
-  const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authError, setAuthError] = useState<string | null>(null)
+  const [authInfo, setAuthInfo] = useState<string | null>(null)
+  const [isSubmittingAuth, setIsSubmittingAuth] = useState(false)
   const [time, setTime] = useState('')
   const [durationMinutes, setDurationMinutes] = useState('')
   const [pace, setPace] = useState('')
@@ -472,7 +479,6 @@ export default function Home() {
   const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([])
   const [isLoadingLocationSuggestions, setIsLoadingLocationSuggestions] = useState(false)
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false)
-  const sessionUserId = session?.user.id ?? null
   const hasCompletedProfile = isProfileComplete(profile)
   const isPaceValid = pace === '' || parsePaceInput(pace) !== null
   const selectedPace = parsePaceInput(pace) == null ? pace : finalizePaceInput(pace)
@@ -492,21 +498,6 @@ export default function Home() {
       : null
   const shouldSkipReverseGeocodeRef = useRef(false)
   const locationInputGroupRef = useRef<HTMLDivElement | null>(null)
-
-  const syncProfileForm = useCallback((nextProfile: Profile | null) => {
-    setProfileName(normalizeProfileText(nextProfile?.name))
-    setProfileNickname(normalizeProfileText(nextProfile?.nickname))
-    setProfileCity(normalizeProfileText(nextProfile?.city))
-    setProfileGender(nextProfile?.gender ?? '')
-  }, [])
-
-  const resetProfileState = useCallback(() => {
-    setProfile(null)
-    setProfileError(null)
-    setIsProfileLoading(false)
-    setProfileSubmitError(null)
-    syncProfileForm(null)
-  }, [syncProfileForm])
 
   const handleSelectedCoordinatesChange = useCallback((value: RunCoordinates | null) => {
     setSelectedCoordinates(value)
@@ -638,76 +629,10 @@ export default function Home() {
   }
 
   useEffect(() => {
-    let isMounted = true
-
-    supabase.auth.getSession().then(({ data }) => {
-      if (isMounted) {
-        setSession(data.session ?? null)
-        if (!data.session) {
-          resetProfileState()
-        }
-        setIsAuthLoading(false)
-      }
-    })
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession)
-      if (!nextSession) {
-        resetProfileState()
-      }
-      setIsAuthLoading(false)
-    })
-
-    return () => {
-      isMounted = false
-      subscription.unsubscribe()
+    if (!isAuthLoading && session && !isProfileLoading && !profileError && !hasCompletedProfile) {
+      router.replace('/onboarding')
     }
-  }, [resetProfileState])
-
-  useEffect(() => {
-    if (!sessionUserId) {
-      return
-    }
-
-    let isCancelled = false
-
-    async function loadProfile() {
-      setIsProfileLoading(true)
-      setProfileError(null)
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select(profileSelect)
-        .eq('id', sessionUserId)
-        .maybeSingle()
-
-      if (isCancelled) {
-        return
-      }
-
-      if (error) {
-        setProfile(null)
-        setProfileError('Не удалось загрузить профиль. Попробуйте ещё раз.')
-        setIsProfileLoading(false)
-        return
-      }
-
-      const nextProfile = data ?? null
-
-      setProfile(nextProfile)
-      setProfileSubmitError(null)
-      syncProfileForm(nextProfile)
-      setIsProfileLoading(false)
-    }
-
-    void loadProfile()
-
-    return () => {
-      isCancelled = true
-    }
-  }, [profileReloadToken, sessionUserId, syncProfileForm])
+  }, [hasCompletedProfile, isAuthLoading, isProfileLoading, profileError, router, session])
 
   useEffect(() => {
     let isMounted = true
@@ -731,82 +656,117 @@ export default function Home() {
   }, [])
 
   async function signInWithGoogle() {
+    setAuthError(null)
+    setAuthInfo(null)
+    setIsSubmittingAuth(true)
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: `${window.location.origin}/`,
       },
     })
 
+    setIsSubmittingAuth(false)
+
     if (error) {
       console.error(error)
+      setAuthError('Не удалось начать вход через Google. Попробуйте ещё раз.')
+    }
+  }
+
+  async function signInWithEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const trimmedEmail = authEmail.trim()
+
+    if (trimmedEmail === '' || authPassword === '') {
+      setAuthInfo(null)
+      setAuthError('Введите email и пароль.')
+      return
+    }
+
+    if (!isValidEmail(trimmedEmail)) {
+      setAuthInfo(null)
+      setAuthError('Укажите корректный email.')
+      return
+    }
+
+    setIsSubmittingAuth(true)
+    setAuthError(null)
+    setAuthInfo(null)
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: trimmedEmail,
+      password: authPassword,
+    })
+
+    setIsSubmittingAuth(false)
+
+    if (error) {
+      setAuthError(getAuthErrorMessage(error.message, 'Не удалось войти. Попробуйте ещё раз.'))
+      return
+    }
+
+    setAuthPassword('')
+  }
+
+  async function signUpWithEmail() {
+    const trimmedEmail = authEmail.trim()
+
+    if (trimmedEmail === '') {
+      setAuthInfo(null)
+      setAuthError('Укажите email.')
+      return
+    }
+
+    if (!isValidEmail(trimmedEmail)) {
+      setAuthInfo(null)
+      setAuthError('Укажите корректный email.')
+      return
+    }
+
+    if (authPassword.length < 6) {
+      setAuthInfo(null)
+      setAuthError('Пароль должен быть не короче 6 символов.')
+      return
+    }
+
+    setIsSubmittingAuth(true)
+    setAuthError(null)
+    setAuthInfo(null)
+
+    const { data, error } = await supabase.auth.signUp({
+      email: trimmedEmail,
+      password: authPassword,
+      options: {
+        emailRedirectTo: `${window.location.origin}/`,
+      },
+    })
+
+    setIsSubmittingAuth(false)
+
+    if (error) {
+      setAuthError(getAuthErrorMessage(error.message, 'Не удалось зарегистрироваться. Попробуйте ещё раз.'))
+      return
+    }
+
+    setAuthPassword('')
+
+    if (!data.session) {
+      setAuthInfo('Проверьте почту, подтвердите email и затем войдите в приложение.')
     }
   }
 
   async function signOut() {
+    setAuthError(null)
+    setAuthInfo(null)
+
     const { error } = await supabase.auth.signOut()
 
     if (error) {
       console.error(error)
     }
-  }
-
-  async function saveProfile(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    if (!session?.user.id) {
-      return
-    }
-
-    const trimmedName = profileName.trim()
-    const trimmedNickname = profileNickname.trim()
-    const trimmedCity = profileCity.trim()
-
-    if (
-      trimmedName === '' ||
-      trimmedNickname === '' ||
-      trimmedCity === '' ||
-      !profileGenders.includes(profileGender as ProfileGender)
-    ) {
-      setProfileSubmitError('Заполните все обязательные поля.')
-      return
-    }
-
-    setIsSavingProfile(true)
-    setProfileSubmitError(null)
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .upsert(
-        {
-          id: session.user.id,
-          name: trimmedName,
-          nickname: trimmedNickname,
-          city: trimmedCity,
-          gender: profileGender,
-        },
-        {
-          onConflict: 'id',
-        }
-      )
-      .select(profileSelect)
-      .single()
-
-    setIsSavingProfile(false)
-
-    if (error) {
-      if (error.code === '23505') {
-        setProfileSubmitError('Этот ник уже занят. Выберите другой.')
-        return
-      }
-
-      console.error(error)
-      setProfileSubmitError('Не удалось сохранить профиль. Попробуйте ещё раз.')
-      return
-    }
-
-    setProfile(data)
-    syncProfileForm(data)
   }
 
   function selectLocationSuggestion(suggestion: LocationSuggestion) {
@@ -1028,14 +988,53 @@ export default function Home() {
 
       {!isAuthLoading && !session && (
         <>
-          <div style={{ marginBottom: 16 }}>
-            <button type="button" onClick={signInWithGoogle}>
+          <form onSubmit={signInWithEmail} style={formStyle}>
+            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Вход или регистрация</h2>
+            <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 4 }}>
+              Войдите по email или через Google. После входа приложение само направит вас дальше.
+            </p>
+
+            <label htmlFor="auth_email" style={labelStyle}>
+              Email
+              <input
+                id="auth_email"
+                type="email"
+                value={authEmail}
+                onChange={(event) => setAuthEmail(event.target.value)}
+                required
+                style={inputStyle}
+              />
+            </label>
+
+            <label htmlFor="auth_password" style={labelStyle}>
+              Пароль
+              <input
+                id="auth_password"
+                type="password"
+                value={authPassword}
+                onChange={(event) => setAuthPassword(event.target.value)}
+                required
+                style={inputStyle}
+              />
+            </label>
+
+            {authError && <div style={{ color: '#b91c1c', fontSize: 14 }}>{authError}</div>}
+            {authInfo && <div style={{ color: '#0f766e', fontSize: 14 }}>{authInfo}</div>}
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button type="submit" disabled={isSubmittingAuth}>
+                {isSubmittingAuth ? 'Выполняем вход...' : 'Войти по email'}
+              </button>
+              <button type="button" onClick={signUpWithEmail} disabled={isSubmittingAuth}>
+                Зарегистрироваться
+              </button>
+            </div>
+          </form>
+
+          <div style={cardStyle}>
+            <button type="button" onClick={signInWithGoogle} disabled={isSubmittingAuth}>
               Войти через Google
             </button>
-          </div>
-
-          <div style={{ ...cardStyle, ...secondaryTextStyle, marginBottom: 20 }}>
-            Чтобы создать пробежку или присоединиться, войдите через Google.
           </div>
         </>
       )}
@@ -1058,7 +1057,7 @@ export default function Home() {
           <div style={{ marginBottom: 8, fontWeight: 600 }}>Не удалось загрузить профиль</div>
           <div style={secondaryTextStyle}>Попробуйте загрузить данные ещё раз.</div>
           <div style={{ marginTop: 12 }}>
-            <button type="button" onClick={() => setProfileReloadToken((current) => current + 1)}>
+            <button type="button" onClick={reloadProfile}>
               Повторить
             </button>
           </div>
@@ -1066,76 +1065,9 @@ export default function Home() {
       )}
 
       {!isAuthLoading && session && !isProfileLoading && !profileError && !hasCompletedProfile && (
-        <form onSubmit={saveProfile} style={formStyle}>
-          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Заполните профиль</h2>
-          <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 4 }}>
-            Это обязательный первый шаг перед использованием приложения.
-          </p>
-
-          <label htmlFor="profile_name" style={labelStyle}>
-            Имя
-            <input
-              id="profile_name"
-              type="text"
-              value={profileName}
-              onChange={(event) => setProfileName(event.target.value)}
-              required
-              style={inputStyle}
-            />
-          </label>
-
-          <label htmlFor="profile_nickname" style={labelStyle}>
-            Никнейм
-            <input
-              id="profile_nickname"
-              type="text"
-              value={profileNickname}
-              onChange={(event) => setProfileNickname(event.target.value)}
-              required
-              style={inputStyle}
-            />
-          </label>
-
-          <label htmlFor="profile_city" style={labelStyle}>
-            Город
-            <input
-              id="profile_city"
-              type="text"
-              value={profileCity}
-              onChange={(event) => setProfileCity(event.target.value)}
-              required
-              style={inputStyle}
-            />
-          </label>
-
-          <label htmlFor="profile_gender" style={labelStyle}>
-            Пол
-            <select
-              id="profile_gender"
-              value={profileGender}
-              onChange={(event) => setProfileGender(event.target.value as ProfileFormGender)}
-              required
-              style={inputStyle}
-            >
-              <option value="">Выберите вариант</option>
-              {profileGenders.map((gender) => (
-                <option key={gender} value={gender}>
-                  {genderLabels[gender]}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {profileSubmitError && (
-            <div style={{ color: '#b91c1c', fontSize: 14 }}>{profileSubmitError}</div>
-          )}
-
-          <div>
-            <button type="submit" disabled={isSavingProfile}>
-              {isSavingProfile ? 'Сохраняем...' : 'Сохранить профиль'}
-            </button>
-          </div>
-        </form>
+        <div style={{ ...cardStyle, ...secondaryTextStyle }}>
+          Перенаправляем на заполнение профиля...
+        </div>
       )}
 
       {!isAuthLoading && (!session || hasCompletedProfile) && (
