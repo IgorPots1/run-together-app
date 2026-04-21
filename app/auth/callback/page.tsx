@@ -27,11 +27,11 @@ const secondaryTextStyle: CSSProperties = {
 
 export default function AuthCallbackPage() {
   const router = useRouter()
-  const { session, isAuthLoading, profile, isProfileLoading, profileError, reloadProfile } = useAuthProfile()
+  const { session, authProfileStatus, isBootstrapResolved, profile, profileError, reloadProfile } = useAuthProfile()
   const hasCompletedProfile = isProfileComplete(profile)
 
   useEffect(() => {
-    if (isAuthLoading) {
+    if (!isBootstrapResolved) {
       return
     }
 
@@ -40,14 +40,14 @@ export default function AuthCallbackPage() {
       return
     }
 
-    if (isProfileLoading || profileError) {
+    if (authProfileStatus !== 'ready') {
       return
     }
 
     router.replace(hasCompletedProfile ? '/' : '/onboarding')
-  }, [hasCompletedProfile, isAuthLoading, isProfileLoading, profileError, router, session])
+  }, [authProfileStatus, hasCompletedProfile, isBootstrapResolved, router, session])
 
-  if (profileError) {
+  if (authProfileStatus === 'error' && profileError) {
     return (
       <div style={pageStyle}>
         <h1 style={{ marginBottom: 8 }}>Завершаем вход</h1>

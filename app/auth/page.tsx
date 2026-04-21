@@ -3,6 +3,7 @@
 import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { getAuthCallbackUrl } from '@/lib/appUrl'
 import { isProfileComplete } from '@/lib/profile'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuthProfile } from '@/lib/useAuthProfile'
@@ -73,13 +74,9 @@ function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
-function getAuthCallbackUrl(): string {
-  return `${window.location.origin}/auth/callback`
-}
-
 export default function AuthPage() {
   const router = useRouter()
-  const { session, isAuthLoading, profile, isProfileLoading, profileError, reloadProfile } = useAuthProfile()
+  const { session, authProfileStatus, profile, profileError, reloadProfile } = useAuthProfile()
   const [authEmail, setAuthEmail] = useState('')
   const [authPassword, setAuthPassword] = useState('')
   const [authError, setAuthError] = useState<string | null>(null)
@@ -89,10 +86,10 @@ export default function AuthPage() {
   const hasCompletedProfile = isProfileComplete(profile)
 
   useEffect(() => {
-    if (!isAuthLoading && session && !isProfileLoading && !profileError) {
+    if (authProfileStatus === 'ready') {
       router.replace(hasCompletedProfile ? '/' : '/onboarding')
     }
-  }, [hasCompletedProfile, isAuthLoading, isProfileLoading, profileError, router, session])
+  }, [authProfileStatus, hasCompletedProfile, router])
 
   async function signInWithGoogle() {
     setAuthError(null)
@@ -197,7 +194,7 @@ export default function AuthPage() {
     }
   }
 
-  if (isAuthLoading) {
+  if (authProfileStatus === 'loading') {
     return (
       <div style={pageStyle}>
         <h1 style={{ marginBottom: 8 }}>Вход</h1>
@@ -209,7 +206,7 @@ export default function AuthPage() {
     )
   }
 
-  if (session && isProfileLoading) {
+  if (authProfileStatus === 'profile_loading') {
     return (
       <div style={pageStyle}>
         <h1 style={{ marginBottom: 8 }}>Вход</h1>
@@ -221,7 +218,7 @@ export default function AuthPage() {
     )
   }
 
-  if (session && profileError) {
+  if (authProfileStatus === 'error' && session && profileError) {
     return (
       <div style={pageStyle}>
         <h1 style={{ marginBottom: 8 }}>Вход</h1>
@@ -241,7 +238,7 @@ export default function AuthPage() {
     )
   }
 
-  if (session) {
+  if (authProfileStatus === 'ready' && session) {
     return (
       <div style={pageStyle}>
         <h1 style={{ marginBottom: 8 }}>Вход</h1>

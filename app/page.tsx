@@ -434,7 +434,8 @@ function formatRunLocationName(locationName: string): string {
 
 export default function Home() {
   const router = useRouter()
-  const { session, isAuthLoading, profile, isProfileLoading, profileError, reloadProfile } = useAuthProfile()
+  const { session, authProfileStatus, isBootstrapResolved, profile, profileError, reloadProfile } =
+    useAuthProfile()
   const [runs, setRuns] = useState<Run[]>([])
   const [time, setTime] = useState('')
   const [durationMinutes, setDurationMinutes] = useState('')
@@ -598,19 +599,19 @@ export default function Home() {
   }
 
   useEffect(() => {
-    if (!isAuthLoading && !session) {
+    if (isBootstrapResolved && !session) {
       router.replace('/auth')
     }
-  }, [isAuthLoading, router, session])
+  }, [isBootstrapResolved, router, session])
 
   useEffect(() => {
-    if (!isAuthLoading && session && !isProfileLoading && !profileError && !hasCompletedProfile) {
+    if (authProfileStatus === 'ready' && !hasCompletedProfile) {
       router.replace('/onboarding')
     }
-  }, [hasCompletedProfile, isAuthLoading, isProfileLoading, profileError, router, session])
+  }, [authProfileStatus, hasCompletedProfile, router])
 
   useEffect(() => {
-    if (!session || !hasCompletedProfile) {
+    if (authProfileStatus !== 'ready' || !session || !hasCompletedProfile) {
       return
     }
 
@@ -632,7 +633,7 @@ export default function Home() {
     return () => {
       isMounted = false
     }
-  }, [hasCompletedProfile, session])
+  }, [authProfileStatus, hasCompletedProfile, session])
 
   async function signOut() {
     const { error } = await supabase.auth.signOut()
@@ -848,7 +849,7 @@ export default function Home() {
     }
   }, [selectedCoordinates])
 
-  if (isAuthLoading) {
+  if (authProfileStatus === 'loading') {
     return (
       <div style={pageStyle}>
         <h1 style={{ marginBottom: 8 }}>Пробежки</h1>
@@ -860,7 +861,7 @@ export default function Home() {
     )
   }
 
-  if (!session) {
+  if (authProfileStatus === 'signed_out' || !session) {
     return (
       <div style={pageStyle}>
         <h1 style={{ marginBottom: 8 }}>Пробежки</h1>
@@ -872,7 +873,7 @@ export default function Home() {
     )
   }
 
-  if (isProfileLoading) {
+  if (authProfileStatus === 'profile_loading') {
     return (
       <div style={pageStyle}>
         <h1 style={{ marginBottom: 8 }}>Пробежки</h1>
@@ -890,7 +891,7 @@ export default function Home() {
     )
   }
 
-  if (profileError) {
+  if (authProfileStatus === 'error' && profileError) {
     return (
       <div style={pageStyle}>
         <h1 style={{ marginBottom: 8 }}>Пробежки</h1>

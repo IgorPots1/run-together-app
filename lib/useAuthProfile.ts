@@ -21,6 +21,8 @@ function getBootstrapProfileName(user: User): string | null {
 
 type UseAuthProfileResult = {
   session: Session | null
+  authProfileStatus: AuthProfileStatus
+  isBootstrapResolved: boolean
   isAuthLoading: boolean
   profile: Profile | null
   isProfileLoading: boolean
@@ -29,18 +31,22 @@ type UseAuthProfileResult = {
   setProfile: (value: Profile | null) => void
 }
 
+export type AuthProfileStatus = 'loading' | 'signed_out' | 'profile_loading' | 'ready' | 'error'
+
+type ProfileLoadStatus = 'idle' | 'loading' | 'ready' | 'error'
+
 export function useAuthProfile(): UseAuthProfileResult {
   const [session, setSession] = useState<Session | null>(null)
   const [isAuthLoading, setIsAuthLoading] = useState(true)
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [isProfileLoading, setIsProfileLoading] = useState(false)
+  const [profileLoadStatus, setProfileLoadStatus] = useState<ProfileLoadStatus>('idle')
   const [profileError, setProfileError] = useState<string | null>(null)
   const [profileReloadToken, setProfileReloadToken] = useState(0)
 
   const resetProfileState = useCallback(() => {
     setProfile(null)
     setProfileError(null)
-    setIsProfileLoading(false)
+    setProfileLoadStatus('idle')
   }, [])
 
   const reloadProfile = useCallback(() => {
@@ -82,17 +88,19 @@ export function useAuthProfile(): UseAuthProfileResult {
     }
   }, [resetProfileState])
 
+  const sessionUserId = session?.user.id ?? null
+
   useEffect(() => {
-    if (!session?.user) {
+    if (!session?.user || !sessionUserId) {
       return
     }
 
     const user = session.user
-    const sessionUserId = user.id
     let isCancelled = false
 
     async function ensureAndLoadProfile() {
-      setIsProfileLoading(true)
+      setProfileLoadStatus('loading')
+      setProfile(null)
       setProfileError(null)
 
       const bootstrapName = getBootstrapProfileName(user)
@@ -110,7 +118,7 @@ export function useAuthProfile(): UseAuthProfileResult {
       if (bootstrapError) {
         setProfile(null)
         setProfileError('Не удалось подготовить профиль. Попробуйте ещё раз.')
-        setIsProfileLoading(false)
+        setProfileLoadStatus('error')
         return
       }
 
@@ -127,12 +135,12 @@ export function useAuthProfile(): UseAuthProfileResult {
       if (error) {
         setProfile(null)
         setProfileError('Не удалось загрузить профиль. Попробуйте ещё раз.')
-        setIsProfileLoading(false)
+        setProfileLoadStatus('error')
         return
       }
 
       setProfile(data ?? null)
-      setIsProfileLoading(false)
+      setProfileLoadStatus('ready')
     }
 
     void ensureAndLoadProfile()
@@ -140,10 +148,25 @@ export function useAuthProfile(): UseAuthProfileResult {
     return () => {
       isCancelled = true
     }
-  }, [profileReloadToken, session])
+  }, [profileReloadToken, session, sessionUserId])
+
+  const authProfileStatus: AuthProfileStatus = isAuthLoading
+    ? 'loading'
+    : !session
+      ? 'signed_out'
+      : profileLoadStatus === 'error'
+        ? 'error'
+        : profileLoadStatus === 'ready'
+          ? 'ready'
+          : 'profile_loading'
+
+  const isBootstrapResolved = authProfileStatus === 'signed_out' || authProfileStatus === 'ready' || authProfileStatus === 'error'
+  const isProfileLoading = authProfileStatus === 'profile_loading'
 
   return {
     session,
+    authProfileStatus,
+    isBootstrapResolved,
     isAuthLoading,
     profile,
     isProfileLoading,

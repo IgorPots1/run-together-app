@@ -64,7 +64,7 @@ const genderLabels: Record<ProfileGender, string> = {
 
 export default function OnboardingPage() {
   const router = useRouter()
-  const { session, isAuthLoading, profile, isProfileLoading, profileError, reloadProfile, setProfile } =
+  const { session, authProfileStatus, isBootstrapResolved, profile, profileError, reloadProfile, setProfile } =
     useAuthProfile()
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -72,18 +72,18 @@ export default function OnboardingPage() {
   const hasCompletedProfile = isProfileComplete(profile)
 
   useEffect(() => {
-    if (!isAuthLoading && !session) {
+    if (isBootstrapResolved && !session) {
       router.replace('/auth')
     }
-  }, [isAuthLoading, router, session])
+  }, [isBootstrapResolved, router, session])
 
   useEffect(() => {
-    if (!isAuthLoading && session && !isProfileLoading && !profileError && hasCompletedProfile) {
+    if (authProfileStatus === 'ready' && hasCompletedProfile) {
       router.replace('/')
     }
-  }, [hasCompletedProfile, isAuthLoading, isProfileLoading, profileError, router, session])
+  }, [authProfileStatus, hasCompletedProfile, router])
 
-  const submitDisabled = isSaving || isAuthLoading || isProfileLoading || !session
+  const submitDisabled = isSaving || authProfileStatus !== 'ready' || !session
   const formDefaults = normalizeProfileDraft({
     name: profile?.name ?? '',
     nickname: profile?.nickname ?? '',
@@ -156,23 +156,25 @@ export default function OnboardingPage() {
         После этого можно будет создавать пробежки и присоединяться к другим.
       </p>
 
-      {isAuthLoading && <div style={{ ...cardStyle, ...secondaryTextStyle }}>Проверяем вход...</div>}
+      {authProfileStatus === 'loading' && (
+        <div style={{ ...cardStyle, ...secondaryTextStyle }}>Проверяем вход...</div>
+      )}
 
-      {!isAuthLoading && !session && (
+      {authProfileStatus === 'signed_out' && !session && (
         <div style={{ ...cardStyle, ...secondaryTextStyle }}>
           Нужно войти в аккаунт, чтобы продолжить.
         </div>
       )}
 
-      {!isAuthLoading && session?.user.email && (
+      {authProfileStatus !== 'loading' && session?.user.email && (
         <div style={{ ...secondaryTextStyle, marginBottom: 16 }}>Вы вошли как {session.user.email}</div>
       )}
 
-      {!isAuthLoading && session && isProfileLoading && (
+      {authProfileStatus === 'profile_loading' && session && (
         <div style={{ ...cardStyle, ...secondaryTextStyle }}>Подготавливаем профиль...</div>
       )}
 
-      {!isAuthLoading && session && !isProfileLoading && profileError && (
+      {authProfileStatus === 'error' && session && profileError && (
         <div style={cardStyle}>
           <div style={{ marginBottom: 8, fontWeight: 600 }}>Не удалось загрузить профиль</div>
           <div style={secondaryTextStyle}>Попробуйте ещё раз.</div>
@@ -184,7 +186,11 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      {!isAuthLoading && session && !isProfileLoading && !profileError && !hasCompletedProfile && (
+      {authProfileStatus === 'ready' && session && hasCompletedProfile && (
+        <div style={{ ...cardStyle, ...secondaryTextStyle }}>Перенаправляем в приложение...</div>
+      )}
+
+      {authProfileStatus === 'ready' && session && !profileError && !hasCompletedProfile && (
         <form key={profile?.updated_at ?? profile?.id ?? 'new-profile'} onSubmit={saveProfile} style={formStyle}>
           <label htmlFor="profile_name" style={labelStyle}>
             Имя
