@@ -181,6 +181,29 @@ const mapActionLinkStyle: CSSProperties = {
 
 const paceOptions = ['05:00', '05:30', '06:00', '06:30', '07:00']
 const mapApiKey = process.env.NEXT_PUBLIC_2GIS_MAP_KEY
+const runnerFriendlyLocationPatterns = [
+  /\bулиц/i,
+  /\bул\./i,
+  /\bпросп/i,
+  /\bпарк/i,
+  /\bсквер/i,
+  /\bнабереж/i,
+  /\bплощад/i,
+  /\bрайон/i,
+  /\bмикрорайон/i,
+  /\bбульвар/i,
+  /\bалле/i,
+  /\bпроезд/i,
+  /\bшоссе/i,
+]
+const verboseLocationPatterns = [
+  /\bроссия\b/i,
+  /\bобласть\b/i,
+  /\bкрай\b/i,
+  /\bреспублика\b/i,
+  /\bгородской округ\b/i,
+  /\bг\./i,
+]
 const RunLocationPicker = dynamic(() => import('@/components/RunLocationPicker'), {
   ssr: false,
 })
@@ -280,17 +303,87 @@ function normalizeLocationPart(value?: string): string | null {
   return normalizedValue === '' ? null : normalizedValue
 }
 
-function resolveShortLocation(item: ReverseGeocodeItem): string | null {
-  const name = normalizeLocationPart(item.name)
-  const addressName = normalizeLocationPart(item.address_name)
-  const buildingName = normalizeLocationPart(item.building_name)
-  const fullName = normalizeLocationPart(item.full_name)
+function splitLocationCandidates(value?: string): string[] {
+  const normalizedValue = normalizeLocationPart(value)
 
-  if (name && addressName && name !== addressName) {
-    return `${name}, ${addressName}`
+  if (!normalizedValue) {
+    return []
   }
 
-  return addressName ?? name ?? buildingName ?? fullName
+  return normalizedValue
+    .split(',')
+    .map((part) => normalizeLocationPart(part) ?? '')
+    .filter((part) => part !== '')
+}
+
+function hasHouseNumber(value: string): boolean {
+  return /\b\d+[а-яa-z]?(?:\/\d+)?\b/i.test(value)
+}
+
+function isRunnerFriendlyLocation(value: string): boolean {
+  return runnerFriendlyLocationPatterns.some((pattern) => pattern.test(value))
+}
+
+function isVerboseLocation(value: string): boolean {
+  return verboseLocationPatterns.some((pattern) => pattern.test(value))
+}
+
+function scoreLocationCandidate(value: string): number {
+  let score = 0
+
+  if (isRunnerFriendlyLocation(value)) {
+    score += 50
+  }
+
+  if (hasHouseNumber(value)) {
+    score -= 14
+  }
+
+  if (value.includes(',')) {
+    score -= 12
+  }
+
+  if (value.length <= 32) {
+    score += 8
+  } else if (value.length <= 48) {
+    score += 3
+  } else {
+    score -= 10
+  }
+
+  if (isVerboseLocation(value)) {
+    score -= 20
+  }
+
+  return score
+}
+
+function resolveShortLocation(item: ReverseGeocodeItem): string | null {
+  const candidates = Array.from(
+    new Set(
+      [
+        normalizeLocationPart(item.name),
+        normalizeLocationPart(item.address_name),
+        normalizeLocationPart(item.building_name),
+        ...splitLocationCandidates(item.address_name),
+        ...splitLocationCandidates(item.full_name),
+      ].filter((value): value is string => value !== null)
+    )
+  )
+
+  if (candidates.length === 0) {
+    return null
+  }
+
+  return [...candidates].sort((left, right) => {
+    const scoreDifference = scoreLocationCandidate(right) - scoreLocationCandidate(left)
+
+    if (scoreDifference !== 0) {
+      return scoreDifference
+    }
+
+    return left.length - right.length
+  })[0]
 }
 
 function getGeolocationErrorMessage(code: number): string {
@@ -351,6 +444,11 @@ export default function Home() {
   const isLocationNameEmpty = trimmedLocationName === ''
   const isSubmitDisabled =
     !session || !isPaceValid || !selectedCoordinates || isLocationNameEmpty || isResolvingLocationName
+  const locationSubmitHint = isResolvingLocationName
+    ? 'Создать пробежку можно после того, как место определится по карте.'
+    : selectedCoordinates && isLocationNameEmpty
+      ? 'Добавьте место вручную или через карту, чтобы создать пробежку.'
+      : null
   const shouldSkipReverseGeocodeRef = useRef(false)
   const locationInputGroupRef = useRef<HTMLDivElement | null>(null)
 
@@ -900,13 +998,15 @@ export default function Home() {
               </ul>
             )}
           </div>
-          {(isLocationNameEmpty || isResolvingLocationName) && (
+          {selectedCoordinates && isLocationNameEmpty && !isResolvingLocationName && (
             <div style={{ ...secondaryTextStyle, marginTop: 6 }}>
-              Укажите место или дождитесь определения адреса
+              Если адрес не подставился, укажите короткое название места вручную.
             </div>
           )}
           {isResolvingLocationName && (
-            <div style={{ ...secondaryTextStyle, marginTop: 6 }}>Определяем адрес по выбранной точке...</div>
+            <div style={{ ...secondaryTextStyle, marginTop: 6 }}>
+              Определяем короткое название места по выбранной точке...
+            </div>
           )}
           {locationLookupError && (
             <div style={{ color: '#b91c1c', fontSize: 14, marginTop: 6 }}>{locationLookupError}</div>
@@ -949,6 +1049,9 @@ export default function Home() {
         </div>
 
         <div style={primaryButtonRowStyle}>
+          {locationSubmitHint && (
+            <div style={{ ...secondaryTextStyle, marginBottom: 8 }}>{locationSubmitHint}</div>
+          )}
           <button type="submit" disabled={isSubmitDisabled}>
             Создать пробежку
           </button>
