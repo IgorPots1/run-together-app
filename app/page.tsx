@@ -432,41 +432,10 @@ function formatRunLocationName(locationName: string): string {
   return normalizedLocationName === '' ? 'Точка на карте выбрана' : normalizedLocationName
 }
 
-function getAuthErrorMessage(message: string, fallbackMessage: string): string {
-  const normalizedMessage = message.toLowerCase()
-
-  if (normalizedMessage.includes('invalid login credentials')) {
-    return 'Неверный email или пароль.'
-  }
-
-  if (normalizedMessage.includes('email not confirmed')) {
-    return 'Подтвердите email по ссылке из письма и войдите снова.'
-  }
-
-  if (normalizedMessage.includes('user already registered')) {
-    return 'Этот email уже зарегистрирован. Попробуйте войти.'
-  }
-
-  if (normalizedMessage.includes('password should be at least')) {
-    return 'Пароль должен быть не короче 6 символов.'
-  }
-
-  return fallbackMessage
-}
-
-function isValidEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
-}
-
 export default function Home() {
   const router = useRouter()
   const { session, isAuthLoading, profile, isProfileLoading, profileError, reloadProfile } = useAuthProfile()
   const [runs, setRuns] = useState<Run[]>([])
-  const [authEmail, setAuthEmail] = useState('')
-  const [authPassword, setAuthPassword] = useState('')
-  const [authError, setAuthError] = useState<string | null>(null)
-  const [authInfo, setAuthInfo] = useState<string | null>(null)
-  const [isSubmittingAuth, setIsSubmittingAuth] = useState(false)
   const [time, setTime] = useState('')
   const [durationMinutes, setDurationMinutes] = useState('')
   const [pace, setPace] = useState('')
@@ -629,12 +598,22 @@ export default function Home() {
   }
 
   useEffect(() => {
+    if (!isAuthLoading && !session) {
+      router.replace('/auth')
+    }
+  }, [isAuthLoading, router, session])
+
+  useEffect(() => {
     if (!isAuthLoading && session && !isProfileLoading && !profileError && !hasCompletedProfile) {
       router.replace('/onboarding')
     }
   }, [hasCompletedProfile, isAuthLoading, isProfileLoading, profileError, router, session])
 
   useEffect(() => {
+    if (!session || !hasCompletedProfile) {
+      return
+    }
+
     let isMounted = true
 
     void (async () => {
@@ -653,115 +632,9 @@ export default function Home() {
     return () => {
       isMounted = false
     }
-  }, [])
-
-  async function signInWithGoogle() {
-    setAuthError(null)
-    setAuthInfo(null)
-    setIsSubmittingAuth(true)
-
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/`,
-      },
-    })
-
-    setIsSubmittingAuth(false)
-
-    if (error) {
-      console.error(error)
-      setAuthError('Не удалось начать вход через Google. Попробуйте ещё раз.')
-    }
-  }
-
-  async function signInWithEmail(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    const trimmedEmail = authEmail.trim()
-
-    if (trimmedEmail === '' || authPassword === '') {
-      setAuthInfo(null)
-      setAuthError('Введите email и пароль.')
-      return
-    }
-
-    if (!isValidEmail(trimmedEmail)) {
-      setAuthInfo(null)
-      setAuthError('Укажите корректный email.')
-      return
-    }
-
-    setIsSubmittingAuth(true)
-    setAuthError(null)
-    setAuthInfo(null)
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email: trimmedEmail,
-      password: authPassword,
-    })
-
-    setIsSubmittingAuth(false)
-
-    if (error) {
-      setAuthError(getAuthErrorMessage(error.message, 'Не удалось войти. Попробуйте ещё раз.'))
-      return
-    }
-
-    setAuthPassword('')
-  }
-
-  async function signUpWithEmail() {
-    const trimmedEmail = authEmail.trim()
-
-    if (trimmedEmail === '') {
-      setAuthInfo(null)
-      setAuthError('Укажите email.')
-      return
-    }
-
-    if (!isValidEmail(trimmedEmail)) {
-      setAuthInfo(null)
-      setAuthError('Укажите корректный email.')
-      return
-    }
-
-    if (authPassword.length < 6) {
-      setAuthInfo(null)
-      setAuthError('Пароль должен быть не короче 6 символов.')
-      return
-    }
-
-    setIsSubmittingAuth(true)
-    setAuthError(null)
-    setAuthInfo(null)
-
-    const { data, error } = await supabase.auth.signUp({
-      email: trimmedEmail,
-      password: authPassword,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-      },
-    })
-
-    setIsSubmittingAuth(false)
-
-    if (error) {
-      setAuthError(getAuthErrorMessage(error.message, 'Не удалось зарегистрироваться. Попробуйте ещё раз.'))
-      return
-    }
-
-    setAuthPassword('')
-
-    if (!data.session) {
-      setAuthInfo('Проверьте почту, подтвердите email и затем войдите в приложение.')
-    }
-  }
+  }, [hasCompletedProfile, session])
 
   async function signOut() {
-    setAuthError(null)
-    setAuthInfo(null)
-
     const { error } = await supabase.auth.signOut()
 
     if (error) {
@@ -975,84 +848,61 @@ export default function Home() {
     }
   }, [selectedCoordinates])
 
-  return (
-    <div style={pageStyle}>
-      <h1 style={{ marginBottom: 8 }}>Пробежки</h1>
-      <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
-        Найдите компанию для пробежки или создайте свою.
-      </p>
-
-      {isAuthLoading && (
+  if (isAuthLoading) {
+    return (
+      <div style={pageStyle}>
+        <h1 style={{ marginBottom: 8 }}>Пробежки</h1>
+        <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
+          Найдите компанию для пробежки или создайте свою.
+        </p>
         <div style={{ ...cardStyle, ...secondaryTextStyle }}>Проверяем вход...</div>
-      )}
+      </div>
+    )
+  }
 
-      {!isAuthLoading && !session && (
-        <>
-          <form onSubmit={signInWithEmail} style={formStyle}>
-            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Вход или регистрация</h2>
-            <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 4 }}>
-              Войдите по email или через Google. После входа приложение само направит вас дальше.
-            </p>
+  if (!session) {
+    return (
+      <div style={pageStyle}>
+        <h1 style={{ marginBottom: 8 }}>Пробежки</h1>
+        <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
+          Найдите компанию для пробежки или создайте свою.
+        </p>
+        <div style={{ ...cardStyle, ...secondaryTextStyle }}>Перенаправляем на вход...</div>
+      </div>
+    )
+  }
 
-            <label htmlFor="auth_email" style={labelStyle}>
-              Email
-              <input
-                id="auth_email"
-                type="email"
-                value={authEmail}
-                onChange={(event) => setAuthEmail(event.target.value)}
-                required
-                style={inputStyle}
-              />
-            </label>
-
-            <label htmlFor="auth_password" style={labelStyle}>
-              Пароль
-              <input
-                id="auth_password"
-                type="password"
-                value={authPassword}
-                onChange={(event) => setAuthPassword(event.target.value)}
-                required
-                style={inputStyle}
-              />
-            </label>
-
-            {authError && <div style={{ color: '#b91c1c', fontSize: 14 }}>{authError}</div>}
-            {authInfo && <div style={{ color: '#0f766e', fontSize: 14 }}>{authInfo}</div>}
-
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button type="submit" disabled={isSubmittingAuth}>
-                {isSubmittingAuth ? 'Выполняем вход...' : 'Войти по email'}
-              </button>
-              <button type="button" onClick={signUpWithEmail} disabled={isSubmittingAuth}>
-                Зарегистрироваться
-              </button>
-            </div>
-          </form>
-
-          <div style={cardStyle}>
-            <button type="button" onClick={signInWithGoogle} disabled={isSubmittingAuth}>
-              Войти через Google
-            </button>
-          </div>
-        </>
-      )}
-
-      {!isAuthLoading && session?.user.email && (
+  if (isProfileLoading) {
+    return (
+      <div style={pageStyle}>
+        <h1 style={{ marginBottom: 8 }}>Пробежки</h1>
+        <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
+          Найдите компанию для пробежки или создайте свою.
+        </p>
         <div style={{ ...secondaryTextStyle, marginBottom: 16 }}>
           Вы вошли как {session.user.email}{' '}
           <button type="button" onClick={signOut}>
             Выйти
           </button>
         </div>
-      )}
-
-      {!isAuthLoading && session && isProfileLoading && (
         <div style={{ ...cardStyle, ...secondaryTextStyle }}>Загружаем профиль...</div>
-      )}
+      </div>
+    )
+  }
 
-      {!isAuthLoading && session && !isProfileLoading && profileError && (
+  if (profileError) {
+    return (
+      <div style={pageStyle}>
+        <h1 style={{ marginBottom: 8 }}>Пробежки</h1>
+        <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
+          Найдите компанию для пробежки или создайте свою.
+        </p>
+        <div style={{ ...secondaryTextStyle, marginBottom: 16 }}>
+          Вы вошли как {session.user.email}{' '}
+          <button type="button" onClick={signOut}>
+            Выйти
+          </button>
+        </div>
         <div style={cardStyle}>
           <div style={{ marginBottom: 8, fontWeight: 600 }}>Не удалось загрузить профиль</div>
           <div style={secondaryTextStyle}>Попробуйте загрузить данные ещё раз.</div>
@@ -1062,17 +912,43 @@ export default function Home() {
             </button>
           </div>
         </div>
-      )}
+      </div>
+    )
+  }
 
-      {!isAuthLoading && session && !isProfileLoading && !profileError && !hasCompletedProfile && (
-        <div style={{ ...cardStyle, ...secondaryTextStyle }}>
-          Перенаправляем на заполнение профиля...
+  if (!hasCompletedProfile) {
+    return (
+      <div style={pageStyle}>
+        <h1 style={{ marginBottom: 8 }}>Пробежки</h1>
+        <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
+          Найдите компанию для пробежки или создайте свою.
+        </p>
+        <div style={{ ...secondaryTextStyle, marginBottom: 16 }}>
+          Вы вошли как {session.user.email}{' '}
+          <button type="button" onClick={signOut}>
+            Выйти
+          </button>
         </div>
-      )}
+        <div style={{ ...cardStyle, ...secondaryTextStyle }}>Перенаправляем на заполнение профиля...</div>
+      </div>
+    )
+  }
 
-      {!isAuthLoading && (!session || hasCompletedProfile) && (
-        <>
-          <form onSubmit={createRun} style={formStyle}>
+  return (
+    <div style={pageStyle}>
+      <h1 style={{ marginBottom: 8 }}>Пробежки</h1>
+      <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
+        Найдите компанию для пробежки или создайте свою.
+      </p>
+
+      <div style={{ ...secondaryTextStyle, marginBottom: 16 }}>
+        Вы вошли как {session.user.email}{' '}
+        <button type="button" onClick={signOut}>
+          Выйти
+        </button>
+      </div>
+
+      <form onSubmit={createRun} style={formStyle}>
         <h2 style={{ marginTop: 0, marginBottom: 16 }}>Создать пробежку</h2>
 
         <label htmlFor="time" style={labelStyle}>
@@ -1168,9 +1044,7 @@ export default function Home() {
             />
             {showLocationSuggestions && (isLoadingLocationSuggestions || locationSuggestions.length > 0) && (
               <ul style={suggestionsListStyle}>
-                {isLoadingLocationSuggestions && (
-                  <li style={suggestionStatusStyle}>Ищем адрес...</li>
-                )}
+                {isLoadingLocationSuggestions && <li style={suggestionStatusStyle}>Ищем адрес...</li>}
                 {!isLoadingLocationSuggestions &&
                   locationSuggestions.map((suggestion, index) => (
                     <li key={`${suggestion.label}-${suggestion.latitude}-${suggestion.longitude}`}>
@@ -1241,24 +1115,20 @@ export default function Home() {
           )}
         </div>
 
-        <div style={secondaryTextStyle}>
-          Выберите точку на карте перед созданием пробежки.
-        </div>
+        <div style={secondaryTextStyle}>Выберите точку на карте перед созданием пробежки.</div>
 
         <div style={primaryButtonRowStyle}>
-          {locationSubmitHint && (
-            <div style={{ ...secondaryTextStyle, marginBottom: 8 }}>{locationSubmitHint}</div>
-          )}
+          {locationSubmitHint && <div style={{ ...secondaryTextStyle, marginBottom: 8 }}>{locationSubmitHint}</div>}
           <button type="submit" disabled={isSubmitDisabled}>
             Создать пробежку
           </button>
         </div>
-          </form>
+      </form>
 
-          {runs.length === 0 && <div style={cardStyle}>Пока нет пробежек</div>}
+      {runs.length === 0 && <div style={cardStyle}>Пока нет пробежек</div>}
 
-          {runs.map((run) => (
-            <div key={run.id} style={cardStyle}>
+      {runs.map((run) => (
+        <div key={run.id} style={cardStyle}>
           <div>
             <h3 style={{ marginTop: 0, marginBottom: 4 }}>{formatRunLocationName(run.location_name)}</h3>
             <div style={secondaryTextStyle}>{formatRunDateTime(run.time)}</div>
@@ -1311,14 +1181,12 @@ export default function Home() {
           )}
 
           <div style={{ marginTop: 16 }}>
-            <button type="button" onClick={() => joinRun(run.id)} disabled={!session || !hasCompletedProfile}>
+            <button type="button" onClick={() => joinRun(run.id)}>
               Присоединиться
             </button>
           </div>
-            </div>
-          ))}
-        </>
-      )}
+        </div>
+      ))}
     </div>
   )
 }

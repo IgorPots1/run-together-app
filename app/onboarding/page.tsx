@@ -73,7 +73,7 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (!isAuthLoading && !session) {
-      router.replace('/')
+      router.replace('/auth')
     }
   }, [isAuthLoading, router, session])
 
