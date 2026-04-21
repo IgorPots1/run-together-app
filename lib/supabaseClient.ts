@@ -1,7 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 
-function getRequiredEnvVar(name: 'NEXT_PUBLIC_SUPABASE_URL' | 'NEXT_PUBLIC_SUPABASE_ANON_KEY') {
-  const value = process.env[name]
+function getRequiredEnvVar(
+  value: string | undefined,
+  name: 'NEXT_PUBLIC_SUPABASE_URL' | 'NEXT_PUBLIC_SUPABASE_ANON_KEY'
+) {
 
   if (!value) {
     throw new Error(
@@ -12,8 +14,11 @@ function getRequiredEnvVar(name: 'NEXT_PUBLIC_SUPABASE_URL' | 'NEXT_PUBLIC_SUPAB
   return value
 }
 
-const supabaseUrl = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_URL')
-const supabaseAnonKey = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+const supabaseUrl = getRequiredEnvVar(process.env.NEXT_PUBLIC_SUPABASE_URL, 'NEXT_PUBLIC_SUPABASE_URL')
+const supabaseAnonKey = getRequiredEnvVar(
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY'
+)
 const isBrowser = typeof window !== 'undefined'
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
