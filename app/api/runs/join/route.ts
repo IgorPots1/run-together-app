@@ -1,5 +1,8 @@
 import { getProfileDisplayName, isProfileComplete } from '@/lib/profile'
-import { supabase } from '@/lib/supabaseClient'
+import {
+  createAuthenticatedSupabaseServerClient,
+  supabase,
+} from '@/lib/supabaseClient'
 
 type JoinRunBody = {
   run_id: string
@@ -32,14 +35,16 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { data: profile, error: profileError } = await supabase
+  const authenticatedSupabase = createAuthenticatedSupabaseServerClient(accessToken)
+
+  const { data: profile, error: profileError } = await authenticatedSupabase
     .from('profiles')
     .select('name, nickname, city, gender')
     .eq('id', user.id)
     .maybeSingle()
 
   if (profileError) {
-    return Response.json({ error: 'Failed to verify profile' }, { status: 500 })
+    return Response.json({ error: profileError.message }, { status: 500 })
   }
 
   if (!isProfileComplete(profile)) {
@@ -55,14 +60,14 @@ export async function POST(request: Request) {
   const joinedAt = new Date().toISOString()
   const joinedUserName = getProfileDisplayName(profile) ?? user.email ?? null
 
-  const { error } = await supabase.from('run_participants').insert({
+  const { error } = await authenticatedSupabase.from('run_participants').insert({
     run_id,
     user_id: user.id,
     created_at: joinedAt,
   })
 
   if (error && error.code !== '23505') {
-    return Response.json({ error: 'Failed to join run' }, { status: 500 })
+    return Response.json({ error: error.message }, { status: 500 })
   }
 
   return Response.json({
