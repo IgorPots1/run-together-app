@@ -43,6 +43,8 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  console.log('run create user.id', user.id)
+
   const authenticatedSupabase = createAuthenticatedSupabaseServerClient(accessToken)
 
   const { data: profile, error: profileError } = await authenticatedSupabase
@@ -52,7 +54,11 @@ export async function POST(request: Request) {
     .maybeSingle()
 
   if (profileError) {
-    return Response.json({ error: profileError.message }, { status: 500 })
+    console.log(profileError)
+    return Response.json(
+      { error: profileError?.message || 'Failed to load profile' },
+      { status: 500 }
+    )
   }
 
   if (!isProfileComplete(profile)) {
@@ -99,38 +105,51 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
+  const runInsertPayload = {
+    creator_id: user.id,
+    time,
+    duration_minutes,
+    distance_km,
+    pace_sec_per_km,
+    location_name,
+    latitude,
+    longitude,
+  }
+
+  console.log('run create payload', runInsertPayload)
+
   const { data: run, error: runError } = await authenticatedSupabase
     .from('runs')
-    .insert({
-      creator_id: user.id,
-      time,
-      duration_minutes,
-      distance_km,
-      pace_sec_per_km,
-      location_name,
-      latitude,
-      longitude,
-    })
+    .insert(runInsertPayload)
     .select()
     .single()
 
   if (runError || !run) {
+    console.log(runError)
     return Response.json(
-      { error: runError?.message ?? 'Run was not created' },
+      { error: runError?.message || 'Failed to create run' },
       { status: 500 }
     )
   }
 
+  const participantInsertPayload = {
+    run_id: run.id,
+    user_id: user.id,
+    created_at: new Date().toISOString(),
+  }
+
+  console.log('run participant payload', participantInsertPayload)
+
   const { error: participantError } = await authenticatedSupabase
     .from('run_participants')
-    .insert({
-      run_id: run.id,
-      user_id: user.id,
-      created_at: new Date().toISOString(),
-    })
+    .insert(participantInsertPayload)
 
   if (participantError) {
-    return Response.json({ error: participantError.message }, { status: 500 })
+    console.log(participantError)
+    return Response.json(
+      { error: participantError?.message || 'Failed to create run participant' },
+      { status: 500 }
+    )
   }
 
   return Response.json(run, { status: 201 })
