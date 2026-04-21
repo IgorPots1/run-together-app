@@ -36,7 +36,6 @@ export function useAuthProfile(): UseAuthProfileResult {
   const [isProfileLoading, setIsProfileLoading] = useState(false)
   const [profileError, setProfileError] = useState<string | null>(null)
   const [profileReloadToken, setProfileReloadToken] = useState(0)
-  const sessionUserId = session?.user.id ?? null
 
   const resetProfileState = useCallback(() => {
     setProfile(null)
@@ -84,17 +83,19 @@ export function useAuthProfile(): UseAuthProfileResult {
   }, [resetProfileState])
 
   useEffect(() => {
-    if (!sessionUserId) {
+    if (!session?.user) {
       return
     }
 
+    const user = session.user
+    const sessionUserId = user.id
     let isCancelled = false
 
     async function ensureAndLoadProfile() {
       setIsProfileLoading(true)
       setProfileError(null)
 
-      const bootstrapName = getBootstrapProfileName(session.user)
+      const bootstrapName = getBootstrapProfileName(user)
       const bootstrapPayload = bootstrapName === null ? { id: sessionUserId } : { id: sessionUserId, name: bootstrapName }
 
       const { error: bootstrapError } = await supabase.from('profiles').upsert(bootstrapPayload, {
@@ -139,7 +140,7 @@ export function useAuthProfile(): UseAuthProfileResult {
     return () => {
       isCancelled = true
     }
-  }, [profileReloadToken, session, sessionUserId])
+  }, [profileReloadToken, session])
 
   return {
     session,
