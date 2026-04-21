@@ -31,7 +31,7 @@ begin
     )
   ) then
     raise exception using
-      message = 'Cannot repoint run foreign keys to public.profiles(id): public.profiles does not exist.';
+      message = 'Cannot repoint run foreign keys to public.profiles(id): public.profiles does not exist. Create/sync public.profiles first, then rerun this migration.';
   end if;
 
   if exists (
@@ -84,7 +84,7 @@ begin
     if runs_orphan_count > 0 then
       raise exception using
         message = format(
-          'Cannot repoint public.runs.creator_id to public.profiles(id): %s row(s) still reference creator_id values with no matching profile after backfilling from auth.users. Sample run ids: %s. Sample missing creator_id values: %s',
+          'Cannot repoint public.runs.creator_id to public.profiles(id): %s row(s) still reference creator_id values with no matching profile after backfilling from auth.users. Manual cleanup is required before rerunning this migration; no rows were deleted. Sample run ids: %s. Sample missing creator_id values: %s',
           runs_orphan_count,
           array_to_string(runs_orphan_sample_ids, ', '),
           array_to_string(runs_orphan_sample_creator_ids, ', ')
@@ -187,7 +187,7 @@ begin
     if run_participants_orphan_count > 0 then
       raise exception using
         message = format(
-          'Cannot repoint public.run_participants.user_id to public.profiles(id): %s row(s) still reference user_id values with no matching profile after backfilling from auth.users. Sample run_id:user_id pairs: %s. Sample missing user_id values: %s',
+          'Cannot repoint public.run_participants.user_id to public.profiles(id): %s row(s) still reference user_id values with no matching profile after backfilling from auth.users. Manual cleanup is required before rerunning this migration; no rows were deleted. Sample run_id:user_id pairs: %s. Sample missing user_id values: %s',
           run_participants_orphan_count,
           array_to_string(run_participants_orphan_sample_keys, ', '),
           array_to_string(run_participants_orphan_sample_user_ids, ', ')
