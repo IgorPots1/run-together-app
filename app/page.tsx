@@ -307,7 +307,8 @@ export default function Home() {
           return (
             <div key={run.id} className="py-4 first:pt-0 last:pb-0">
               <Card
-                className="rounded-2xl border-border/70 shadow-sm transition-all duration-200 ease-out hover:border-border hover:shadow-md"
+                size="sm"
+                className="gap-0 rounded-2xl border-border/70 py-0 shadow-sm transition-all duration-200 ease-out hover:border-border hover:shadow-md"
                 role="button"
                 tabIndex={0}
                 aria-expanded={isExpanded}
@@ -319,36 +320,36 @@ export default function Home() {
                   }
                 }}
               >
-                <CardHeader className="space-y-2 p-4 pb-2.5">
+                <CardHeader className="space-y-1 p-3 pb-1.5 sm:px-3.5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 space-y-0.5">
-                      <CardTitle className="truncate text-base font-semibold leading-tight text-foreground sm:text-[1.05rem]">
+                      <CardTitle className="truncate text-[0.95rem] font-semibold leading-tight text-foreground sm:text-base">
                         {formatRunLocationName(run.location_name)}
                       </CardTitle>
-                      <CardDescription className="truncate text-[13px] text-muted-foreground">
+                      <CardDescription className="truncate text-xs leading-snug text-muted-foreground">
                         {formatRunDateTime(run.time)}
                       </CardDescription>
                     </div>
                     <ChevronDown
-                      className={`mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform duration-200 ${
+                      className={`mt-0.5 size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ${
                         isExpanded ? 'rotate-180' : ''
                       }`}
                     />
                   </div>
                 </CardHeader>
 
-                <CardContent className="space-y-2.5 p-4 pt-0">
-                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                    <div className="inline-flex items-center gap-1 rounded-full bg-primary/[0.06] px-2.5 py-0.5 font-medium text-foreground">
-                      <Gauge className="size-3.5 text-primary" />
+                <CardContent className="space-y-1.5 p-3 pt-0 sm:px-3.5">
+                  <div className="flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+                    <div className="inline-flex h-5 items-center gap-1 rounded-full bg-primary/[0.06] px-2 py-0 font-medium text-foreground">
+                      <Gauge className="size-3 text-primary" />
                       <span>{formatPace(run.pace_sec_per_km)}</span>
                     </div>
-                    <div className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 font-medium">
-                      <Users className="size-3.5" />
+                    <div className="inline-flex h-5 items-center gap-1 rounded-full bg-muted px-2 py-0 font-medium">
+                      <Users className="size-3" />
                       <span>{run.participants_count} участ.</span>
                     </div>
                     {creatorGenderLabel ? (
-                      <div className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 font-medium">
+                      <div className="inline-flex h-5 items-center rounded-full bg-muted px-2 py-0 font-medium">
                         <span>{creatorGenderLabel}</span>
                       </div>
                     ) : null}
@@ -362,7 +363,7 @@ export default function Home() {
                     <div className="min-h-0">
                       <div
                         className={`overflow-hidden text-sm leading-6 text-muted-foreground transition-all duration-300 ease-out ${
-                          isExpanded ? 'mt-0.5 border-t border-border/60 pt-2.5' : 'mt-0 pt-0'
+                          isExpanded ? 'border-t border-border/60 pt-2' : 'pt-0'
                         }`}
                         onClick={(event) => event.stopPropagation()}
                       >
@@ -402,10 +403,10 @@ export default function Home() {
                   </div>
                 </CardContent>
 
-                <CardFooter className="border-0 bg-transparent p-4 pt-1.5">
+                <CardFooter className="border-0 bg-transparent p-3 pt-1 sm:px-3.5">
                   <Button
                     type="button"
-                    className="h-11 w-full rounded-xl text-sm font-semibold shadow-lg shadow-primary/20"
+                    className="h-10 w-full rounded-xl px-3 text-[13px] font-semibold shadow-lg shadow-primary/20"
                     onClick={(event) => {
                       event.stopPropagation()
                       void joinRun(run.id)
