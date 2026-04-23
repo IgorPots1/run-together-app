@@ -710,16 +710,14 @@ export default function CreateRunPage() {
             className="max-w-full border-border/60 shadow-none"
           >
             <Field htmlFor="time" label="Дата и время">
-              <div className="max-w-full overflow-hidden rounded-xl">
-                <Input
-                  id="time"
-                  type="datetime-local"
-                  value={time}
-                  onChange={(event) => setTime(event.target.value)}
-                  required
-                  className="w-full max-w-full min-w-0 bg-background [font-variant-numeric:tabular-nums] [&::-webkit-calendar-picker-indicator]:ml-2 [&::-webkit-date-and-time-value]:text-left [&::-webkit-datetime-edit]:block [&::-webkit-datetime-edit]:min-w-0 [&::-webkit-datetime-edit]:overflow-hidden [&::-webkit-datetime-edit]:leading-5 [&::-webkit-datetime-edit-fields-wrapper]:min-w-0"
-                />
-              </div>
+              <Input
+                id="time"
+                type="datetime-local"
+                value={time}
+                onChange={(event) => setTime(event.target.value)}
+                required
+                className="box-border w-full max-w-full bg-background"
+              />
             </Field>
 
             <Field htmlFor="duration_minutes" label="Длительность, минут">

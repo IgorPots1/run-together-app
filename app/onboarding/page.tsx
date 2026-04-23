@@ -7,7 +7,6 @@ import { AuthSplash } from '@/components/AuthSplash'
 import {
   isProfileComplete,
   normalizeProfileDraft,
-  profileGenders,
   profileSelect,
   validateProfileDraft,
   type ProfileGender,
@@ -16,6 +15,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { useAuthProfile } from '@/lib/useAuthProfile'
 
 type ProfileFormGender = ProfileGender | ''
+const onboardingGenderOptions: ProfileGender[] = ['male', 'female']
 
 const pageStyle: CSSProperties = {
   maxWidth: 520,
@@ -57,10 +57,9 @@ const secondaryTextStyle: CSSProperties = {
   fontSize: 14,
 }
 
-const genderLabels: Record<ProfileGender, string> = {
-  male: 'Мужской',
-  female: 'Женский',
-  prefer_not_to_say: 'Предпочитаю не указывать',
+const genderLabels: Record<(typeof onboardingGenderOptions)[number], string> = {
+  male: 'Мужчина',
+  female: 'Женщина',
 }
 
 export default function OnboardingPage() {
@@ -230,7 +229,7 @@ export default function OnboardingPage() {
               style={inputStyle}
             >
               <option value="">Выберите вариант</option>
-              {profileGenders.map((profileGender) => (
+              {onboardingGenderOptions.map((profileGender) => (
                 <option key={profileGender} value={profileGender}>
                   {genderLabels[profileGender]}
                 </option>

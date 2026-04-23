@@ -48,15 +48,10 @@ function AuthShell({
   children: ReactNode
 }) {
   return (
-    <PageContainer className="justify-center gap-6 pb-10 pt-10">
-      <div className="space-y-3">
-        <div className="inline-flex rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
-          Run Together
-        </div>
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground">{title}</h1>
-          <p className="max-w-[34ch] text-sm leading-6 text-muted-foreground">{description}</p>
-        </div>
+    <PageContainer className="justify-center gap-4 pb-10 pt-10">
+      <div className="space-y-1.5">
+        <h1 className="text-3xl font-semibold tracking-tight text-foreground">{title}</h1>
+        <p className="max-w-[34ch] text-sm text-muted-foreground">{description}</p>
       </div>
       {children}
     </PageContainer>
@@ -232,7 +227,7 @@ export default function AuthPage() {
     return (
       <AuthShell
         title="Войти"
-        description="Войдите по email или через Google, чтобы смотреть пробежки и создавать свои."
+        description="Войдите, чтобы продолжить"
       >
         <section className="space-y-4 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
           <div className="space-y-1">
@@ -250,11 +245,11 @@ export default function AuthPage() {
   return (
     <AuthShell
       title="Войти"
-      description="Войдите по email или через Google, чтобы смотреть пробежки и создавать свои."
+      description="Войдите, чтобы продолжить"
     >
       <form
         onSubmit={signInWithEmail}
-        className="space-y-5 rounded-2xl border border-border/70 bg-card p-5 shadow-sm"
+        className="space-y-4 rounded-2xl border border-border/70 bg-card p-5 shadow-sm"
       >
         <div className="space-y-1">
           <h2 className="text-lg font-semibold text-foreground">Продолжить с email</h2>
@@ -291,12 +286,17 @@ export default function AuthPage() {
         {authInfo ? <AuthMessage tone="info">{authInfo}</AuthMessage> : null}
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Button type="submit" disabled={isSubmittingAuth} className="h-12 rounded-xl text-sm font-semibold">
+          <Button
+            type="submit"
+            variant="default"
+            disabled={isSubmittingAuth}
+            className="h-12 rounded-xl text-sm font-semibold shadow-sm"
+          >
             {isSubmittingAuth ? 'Выполняем вход...' : 'Войти'}
           </Button>
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             onClick={signUpWithEmail}
             disabled={isSubmittingAuth}
             className="h-12 rounded-xl text-sm font-semibold"
@@ -313,7 +313,7 @@ export default function AuthPage() {
 
         <Button
           type="button"
-          variant="outline"
+          variant="secondary"
           onClick={signInWithGoogle}
           disabled={isSubmittingAuth}
           className="h-12 w-full rounded-xl text-sm font-medium"

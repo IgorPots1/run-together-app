@@ -30,7 +30,7 @@ export async function GET() {
   if (userIds.length > 0) {
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, name, nickname')
+      .select('id, name, nickname, gender')
       .in('id', userIds)
 
     if (profilesError) {
@@ -64,6 +64,7 @@ export async function GET() {
         id: run.id,
         creator_id: run.creator_id,
         creator_name: getProfileDisplayName(profilesById.get(run.creator_id)),
+        creator_gender: profilesById.get(run.creator_id)?.gender ?? null,
         time: run.time,
         duration_minutes: run.duration_minutes,
         distance_km: run.distance_km,

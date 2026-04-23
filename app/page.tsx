@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, type ReactNode } from 'react'
-import { CalendarDays, Gauge, LogOut, MapPin, Plus, TimerReset, Users } from 'lucide-react'
+import { ChevronDown, Gauge, LogOut, MapPin, Plus, TimerReset, Users } from 'lucide-react'
 
 import { AuthSplash } from '@/components/AuthSplash'
 import { Button } from '@/components/ui/button'
@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/card'
 import { PageContainer } from '@/components/ui/page-container'
 import { SectionBlock } from '@/components/ui/section-block'
-import { getProfileDisplayName, isProfileComplete } from '@/lib/profile'
+import { getProfileDisplayName, isProfileComplete, type ProfileGender } from '@/lib/profile'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuthProfile } from '@/lib/useAuthProfile'
 
@@ -29,6 +29,7 @@ type Run = {
   id: string
   creator_id: string
   creator_name: string | null
+  creator_gender: ProfileGender | null
   time: string
   duration_minutes: number | null
   distance_km: number | null
@@ -66,6 +67,18 @@ function formatParticipantName(participant: Participant): string {
   return participant.name ?? 'Участник'
 }
 
+function formatGenderLabel(gender: ProfileGender | null): string | null {
+  if (gender === 'male') {
+    return 'Мужчина'
+  }
+
+  if (gender === 'female') {
+    return 'Женщина'
+  }
+
+  return null
+}
+
 function build2GisUrl(latitude: number, longitude: number): string {
   return `https://2gis.ru/geo/${longitude},${latitude}`
 }
@@ -74,32 +87,6 @@ function formatRunLocationName(locationName: string): string {
   const normalizedLocationName = locationName.trim()
 
   return normalizedLocationName === '' ? 'Точка на карте выбрана' : normalizedLocationName
-}
-
-function MetaItem({
-  icon,
-  label,
-  value,
-  highlighted = false,
-}: {
-  icon: ReactNode
-  label: string
-  value: string
-  highlighted?: boolean
-}) {
-  return (
-    <div
-      className={`rounded-xl border p-3.5 ${
-        highlighted ? 'border-primary/20 bg-primary/[0.05]' : 'border-border/60 bg-transparent'
-      }`}
-    >
-      <div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground/75">
-        {icon}
-        <span>{label}</span>
-      </div>
-      <div className="text-sm font-medium leading-6 text-foreground">{value}</div>
-    </div>
-  )
 }
 
 function HomeShell({
@@ -147,12 +134,20 @@ export default function Home() {
   const { session, authProfileStatus, isBootstrapResolved, profile, profileError, reloadProfile } =
     useAuthProfile()
   const [runs, setRuns] = useState<Run[]>([])
+  const [expandedRunIds, setExpandedRunIds] = useState<Record<string, boolean>>({})
   const hasCompletedProfile = isProfileComplete(profile)
   const shouldShowSplash =
     !isBootstrapResolved ||
     !session ||
     authProfileStatus === 'profile_loading' ||
     (authProfileStatus === 'ready' && !hasCompletedProfile)
+
+  function toggleRunExpanded(runId: string) {
+    setExpandedRunIds((current) => ({
+      ...current,
+      [runId]: !current[runId],
+    }))
+  }
 
   async function joinRun(runId: string) {
     if (!session?.access_token || !hasCompletedProfile) {
@@ -298,104 +293,132 @@ export default function Home() {
         Создать пробежку
       </Button>
 
-      <section className="space-y-4">
+      <section className="divide-y divide-border/50">
         {runs.length === 0 ? (
           <SectionBlock>
             <p className="text-sm text-muted-foreground">Пока нет пробежек.</p>
           </SectionBlock>
         ) : null}
 
-        {runs.map((run) => (
-          <Card key={run.id} className="rounded-2xl border-border/70 shadow-sm">
-            <CardHeader className="space-y-4 pb-2">
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-2">
-                  <CardTitle className="text-xl font-bold leading-tight text-foreground">
-                    {formatRunLocationName(run.location_name)}
-                  </CardTitle>
-                  <CardDescription className="text-xs leading-5 text-muted-foreground/80">
-                    {formatRunDateTime(run.time)}
-                  </CardDescription>
-                </div>
-                <div className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-                  {run.participants_count} участ.
-                </div>
-              </div>
-            </CardHeader>
+        {runs.map((run) => {
+          const isExpanded = expandedRunIds[run.id] ?? false
+          const creatorGenderLabel = formatGenderLabel(run.creator_gender)
 
-            <CardContent className="space-y-6 pt-2">
-              <div className="grid grid-cols-2 gap-3">
-                <MetaItem
-                  icon={<CalendarDays className="size-3.5" />}
-                  label="Время"
-                  value={formatRunDateTime(run.time)}
-                  highlighted
-                />
-                <MetaItem
-                  icon={<Gauge className="size-3.5" />}
-                  label="Темп"
-                  value={formatPace(run.pace_sec_per_km)}
-                  highlighted
-                />
-                <MetaItem
-                  icon={<MapPin className="size-3.5" />}
-                  label="Локация"
-                  value={formatRunLocationName(run.location_name)}
-                />
-                <MetaItem
-                  icon={<Users className="size-3.5" />}
-                  label="Участники"
-                  value={String(run.participants_count)}
-                />
-              </div>
-
-              <div className="space-y-3 text-sm leading-6 text-muted-foreground/80">
-                <p>
-                  <span className="font-medium text-foreground">Создал:</span> {formatCreatorName(run)}
-                </p>
-                <p>
-                  <span className="font-medium text-foreground">Длительность:</span>{' '}
-                  {run.duration_minutes ?? 'Не указана'} мин
-                </p>
-                <p>
-                  <span className="font-medium text-foreground">Состав:</span>{' '}
-                  {run.participants.length > 0
-                    ? run.participants.map((participant) => formatParticipantName(participant)).join(', ')
-                    : 'Пока никто не присоединился'}
-                </p>
-                {run.latitude != null && run.longitude != null ? (
-                  <p>
-                    <a
-                      href={build2GisUrl(run.latitude, run.longitude)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-medium text-primary hover:underline"
-                    >
-                      Открыть точку на карте
-                    </a>
-                  </p>
-                ) : null}
-                {run.last_joined_user_name ? (
-                  <p>Недавно присоединился: {run.last_joined_user_name}</p>
-                ) : null}
-                {!run.last_joined_user_name && run.last_joined_at ? (
-                  <p>Недавно присоединился ещё один участник</p>
-                ) : null}
-              </div>
-            </CardContent>
-
-            <CardFooter className="border-t-0 bg-transparent p-6 pt-1">
-              <Button
-                type="button"
-                className="h-12 w-full rounded-xl text-base font-semibold shadow-lg shadow-primary/25"
-                onClick={() => joinRun(run.id)}
+          return (
+            <div key={run.id} className="py-4 first:pt-0 last:pb-0">
+              <Card
+                className="rounded-2xl border-border/70 shadow-sm transition-all duration-200 ease-out hover:border-border hover:shadow-md"
+                role="button"
+                tabIndex={0}
+                aria-expanded={isExpanded}
+                onClick={() => toggleRunExpanded(run.id)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    toggleRunExpanded(run.id)
+                  }
+                }}
               >
-                <TimerReset className="size-4" />
-                Присоединиться
-              </Button>
-            </CardFooter>
-          </Card>
-        ))}
+                <CardHeader className="space-y-3 p-5 pb-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                      <CardTitle className="truncate text-lg font-semibold leading-tight text-foreground">
+                        {formatRunLocationName(run.location_name)}
+                      </CardTitle>
+                      <CardDescription className="truncate text-sm text-muted-foreground">
+                        {formatRunDateTime(run.time)}
+                      </CardDescription>
+                    </div>
+                    <ChevronDown
+                      className={`mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform duration-200 ${
+                        isExpanded ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </div>
+                </CardHeader>
+
+                <CardContent className="space-y-3 p-5 pt-0">
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                    <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/[0.06] px-3 py-1 font-medium text-foreground">
+                      <Gauge className="size-3.5 text-primary" />
+                      <span>{formatPace(run.pace_sec_per_km)}</span>
+                    </div>
+                    <div className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 font-medium">
+                      <Users className="size-3.5" />
+                      <span>{run.participants_count} участ.</span>
+                    </div>
+                    {creatorGenderLabel ? (
+                      <div className="inline-flex items-center rounded-full bg-muted px-3 py-1 font-medium">
+                        <span>{creatorGenderLabel}</span>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div
+                    className={`grid overflow-hidden transition-all duration-300 ease-out ${
+                      isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+                    }`}
+                  >
+                    <div className="min-h-0">
+                      <div
+                        className={`overflow-hidden text-sm leading-6 text-muted-foreground transition-all duration-300 ease-out ${
+                          isExpanded ? 'mt-1 border-t border-border/60 pt-3' : 'mt-0 pt-0'
+                        }`}
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <div className="space-y-2.5">
+                          <p>
+                            <span className="font-medium text-foreground">Длительность:</span>{' '}
+                            {run.duration_minutes ?? 'Не указана'} мин
+                          </p>
+                          <p>
+                            <span className="font-medium text-foreground">Создал:</span> {formatCreatorName(run)}
+                            {creatorGenderLabel ? ` (${creatorGenderLabel})` : ''}
+                          </p>
+                          <p>
+                            <span className="font-medium text-foreground">Участники:</span>{' '}
+                            {run.participants.length > 0
+                              ? run.participants
+                                  .map((participant) => formatParticipantName(participant))
+                                  .join(', ')
+                              : 'Пока никто не присоединился'}
+                          </p>
+                          {run.latitude != null && run.longitude != null ? (
+                            <p>
+                              <a
+                                href={build2GisUrl(run.latitude, run.longitude)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                              >
+                                <MapPin className="size-3.5" />
+                                Открыть точку на карте
+                              </a>
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+
+                <CardFooter className="bg-transparent p-5 pt-0">
+                  <Button
+                    type="button"
+                    className="h-11 w-full rounded-xl text-sm font-semibold shadow-lg shadow-primary/20"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      void joinRun(run.id)
+                    }}
+                  >
+                    <TimerReset className="size-4" />
+                    Присоединиться
+                  </Button>
+                </CardFooter>
+              </Card>
+            </div>
+          )
+        })}
       </section>
     </HomeShell>
   )
