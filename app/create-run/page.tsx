@@ -145,6 +145,93 @@ function normalizeDurationInput(value: string): string {
   return value.replace(/\D/g, '')
 }
 
+function normalizeDateInput(value: string): string {
+  const digits = value.replace(/[^\d.]/g, '').replace(/\D/g, '').slice(0, 8)
+
+  if (digits.length <= 2) {
+    return digits
+  }
+
+  if (digits.length <= 4) {
+    return `${digits.slice(0, 2)}.${digits.slice(2)}`
+  }
+
+  return `${digits.slice(0, 2)}.${digits.slice(2, 4)}.${digits.slice(4)}`
+}
+
+function normalizeTimeInput(value: string): string {
+  const cleanedValue = value.replace(/[^\d:]/g, '')
+
+  if (cleanedValue === '') {
+    return ''
+  }
+
+  if (cleanedValue.includes(':')) {
+    const [hoursPart = '', minutesPart = ''] = cleanedValue.split(':', 2)
+    const hours = hoursPart.replace(/\D/g, '').slice(0, 2)
+    const minutes = minutesPart.replace(/\D/g, '').slice(0, 2)
+
+    if (cleanedValue.endsWith(':') && minutes === '') {
+      return hours === '' ? '' : `${hours}:`
+    }
+
+    return minutes === '' ? hours : `${hours}:${minutes}`
+  }
+
+  const digits = cleanedValue.replace(/\D/g, '').slice(0, 4)
+
+  if (digits.length <= 2) {
+    return digits
+  }
+
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`
+}
+
+function parseDateInput(value: string): { day: number; month: number; year: number } | null {
+  const match = value.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})$/)
+
+  if (!match) {
+    return null
+  }
+
+  const day = Number(match[1])
+  const month = Number(match[2])
+  const year = Number(match[3])
+
+  if (month < 1 || month > 12 || day < 1) {
+    return null
+  }
+
+  const candidateDate = new Date(year, month - 1, day)
+
+  if (
+    candidateDate.getFullYear() !== year ||
+    candidateDate.getMonth() !== month - 1 ||
+    candidateDate.getDate() !== day
+  ) {
+    return null
+  }
+
+  return { day, month, year }
+}
+
+function parseTimeInput(value: string): { hours: number; minutes: number } | null {
+  const match = value.trim().match(/^(\d{2}):(\d{2})$/)
+
+  if (!match) {
+    return null
+  }
+
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return null
+  }
+
+  return { hours, minutes }
+}
+
 function normalizeLocationPart(value?: string): string | null {
   if (!value) {
     return null
@@ -294,15 +381,20 @@ function Field({
 }
 
 function combineDateAndTime(date: string, time: string): string | null {
-  if (date === '' || time === '') {
+  const parsedDate = parseDateInput(date)
+  const parsedTime = parseTimeInput(time)
+
+  if (parsedDate == null || parsedTime == null) {
     return null
   }
 
-  const combinedDateTime = new Date(`${date}T${time}`)
-
-  if (Number.isNaN(combinedDateTime.getTime())) {
-    return null
-  }
+  const combinedDateTime = new Date(
+    parsedDate.year,
+    parsedDate.month - 1,
+    parsedDate.day,
+    parsedTime.hours,
+    parsedTime.minutes
+  )
 
   return combinedDateTime.toISOString()
 }
@@ -375,17 +467,37 @@ export default function CreateRunPage() {
   const hasCompletedProfile = isProfileComplete(profile)
   const isPaceValid = pace === '' || parsePaceInput(pace) !== null
   const selectedPace = parsePaceInput(pace) == null ? pace : finalizePaceInput(pace)
+  const isDateValid = parseDateInput(date) !== null
+  const isTimeValid = parseTimeInput(time) !== null
+  const runDateTimeIso = combineDateAndTime(date, time)
   const trimmedLocationName = locationName.trim()
   const isLocationNameEmpty = trimmedLocationName === ''
   const isSubmitDisabled =
     !session ||
     !hasCompletedProfile ||
     !isPaceValid ||
-    !date ||
-    !time ||
+    !isDateValid ||
+    !isTimeValid ||
+    runDateTimeIso == null ||
     !selectedCoordinates ||
     isLocationNameEmpty ||
     isResolvingLocationName
+  const dateValidationMessage =
+    date === ''
+      ? null
+      : !/^\d{2}\.\d{2}\.\d{4}$/.test(date)
+        ? 'Введите дату в формате дд.мм.гггг.'
+        : !isDateValid
+          ? 'Проверьте дату.'
+          : null
+  const timeValidationMessage =
+    time === ''
+      ? null
+      : !/^\d{2}:\d{2}$/.test(time)
+        ? 'Введите время в формате чч:мм.'
+        : !isTimeValid
+          ? 'Проверьте время.'
+          : null
   const locationStatusText = isResolvingLocationName
     ? 'Определяем место старта...'
     : selectedCoordinates
@@ -422,7 +534,6 @@ export default function CreateRunPage() {
     }
 
     const paceSecPerKm = parsePaceInput(pace)
-    const runDateTimeIso = combineDateAndTime(date, time)
 
     if (paceSecPerKm == null || selectedCoordinates == null || runDateTimeIso == null) {
       return
@@ -735,25 +846,41 @@ export default function CreateRunPage() {
               <Field htmlFor="date" label="Дата">
                 <Input
                   id="date"
-                  type="date"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="24.04.2026"
                   value={date}
-                  onChange={(event) => setDate(event.target.value)}
+                  onChange={(event) => setDate(normalizeDateInput(event.target.value))}
                   required
-                  className="h-10 w-full max-w-full min-w-0 rounded-lg bg-background px-3 py-2 text-[15px] leading-4"
+                  maxLength={10}
+                  aria-invalid={!isDateValid && date !== ''}
+                  className="w-full max-w-full bg-background"
                 />
               </Field>
 
               <Field htmlFor="time" label="Время">
                 <Input
                   id="time"
-                  type="time"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="18:30"
                   value={time}
-                  onChange={(event) => setTime(event.target.value)}
+                  onChange={(event) => setTime(normalizeTimeInput(event.target.value))}
                   required
-                  className="h-10 w-full max-w-full min-w-0 rounded-lg bg-background px-3 py-2 text-[15px] leading-4"
+                  maxLength={5}
+                  aria-invalid={!isTimeValid && time !== ''}
+                  className="w-full max-w-full bg-background"
                 />
               </Field>
             </div>
+
+            {dateValidationMessage ? (
+              <p className="text-sm text-destructive">{dateValidationMessage}</p>
+            ) : null}
+
+            {timeValidationMessage ? (
+              <p className="text-sm text-destructive">{timeValidationMessage}</p>
+            ) : null}
 
             <Field htmlFor="duration_minutes" label="Длительность, минут">
               <Input
