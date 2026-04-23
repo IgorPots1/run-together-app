@@ -56,8 +56,8 @@ const pageStyle: CSSProperties = {
 
 const cardStyle: CSSProperties = {
   border: '1px solid #d1d5db',
-  borderRadius: 12,
-  padding: 16,
+  borderRadius: 16,
+  padding: 24,
   marginBottom: 12,
   backgroundColor: '#fff',
 }
@@ -65,10 +65,12 @@ const cardStyle: CSSProperties = {
 const inputStyle: CSSProperties = {
   width: '100%',
   boxSizing: 'border-box',
-  padding: '10px 12px',
+  minHeight: 52,
+  padding: '14px 16px',
   border: '1px solid #cbd5e1',
-  borderRadius: 8,
-  marginTop: 6,
+  borderRadius: 10,
+  marginTop: 8,
+  fontSize: 16,
 }
 
 const labelStyle: CSSProperties = {
@@ -126,10 +128,17 @@ const formStyle: CSSProperties = {
   gap: 0,
 }
 
+const sectionTitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: 18,
+  fontWeight: 700,
+  color: '#0f172a',
+}
+
 const sectionStyle: CSSProperties = {
   ...cardStyle,
   display: 'grid',
-  gap: 14,
+  gap: 18,
   marginBottom: 0,
 }
 
@@ -156,17 +165,19 @@ const chipStyle: CSSProperties = {
 const actionRowStyle: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
-  gap: 8,
-  marginTop: 12,
+  gap: 12,
+  marginTop: 4,
 }
 
 const secondaryButtonStyle: CSSProperties = {
   border: '1px solid #cbd5e1',
   borderRadius: 10,
-  padding: '10px 14px',
-  backgroundColor: '#fff',
+  minHeight: 48,
+  padding: '12px 16px',
+  backgroundColor: 'transparent',
   cursor: 'pointer',
   fontWeight: 600,
+  color: '#334155',
 }
 
 const stickyActionBarStyle: CSSProperties = {
@@ -189,13 +200,25 @@ const stickyActionInnerStyle: CSSProperties = {
 const primaryButtonStyle: CSSProperties = {
   width: '100%',
   border: 0,
-  borderRadius: 12,
-  padding: '14px 16px',
+  minHeight: 56,
+  borderRadius: 14,
+  padding: '16px 20px',
   backgroundColor: '#2563eb',
   color: '#fff',
-  fontSize: 16,
+  fontSize: 17,
   fontWeight: 700,
   cursor: 'pointer',
+  boxShadow: '0 10px 24px rgba(37, 99, 235, 0.28)',
+}
+
+const locationStatusStyle: CSSProperties = {
+  ...secondaryTextStyle,
+  minHeight: 20,
+}
+
+const mapBlockStyle: CSSProperties = {
+  display: 'grid',
+  gap: 12,
 }
 
 const paceOptions = ['05:00', '05:30', '06:00', '06:30', '07:00']
@@ -442,13 +465,13 @@ export default function CreateRunPage() {
     !selectedCoordinates ||
     isLocationNameEmpty ||
     isResolvingLocationName
-  const locationSubmitHint = !selectedCoordinates
-    ? 'Выберите место старта.'
-    : isResolvingLocationName
-      ? 'Определяем место старта...'
-      : isLocationNameEmpty
-        ? 'Укажите место старта.'
-        : null
+  const locationStatusText = isResolvingLocationName
+    ? 'Определяем место старта...'
+    : selectedCoordinates
+      ? trimmedLocationName !== ''
+        ? `Выбрано: ${trimmedLocationName}`
+        : `Выбрано: ${selectedCoordinates.latitude.toFixed(5)}, ${selectedCoordinates.longitude.toFixed(5)}`
+      : 'Выберите место старта'
   const shouldShowSplash =
     !isBootstrapResolved ||
     !session ||
@@ -796,6 +819,7 @@ export default function CreateRunPage() {
 
       <form id="create-run-form" onSubmit={createRun} style={formStyle}>
         <div style={sectionStyle}>
+          <h2 style={sectionTitleStyle}>Основное</h2>
           <label htmlFor="time" style={labelStyle}>
             Дата и время
             <input
@@ -824,6 +848,7 @@ export default function CreateRunPage() {
         </div>
 
         <div style={{ ...sectionStyle, ...sectionSpacingStyle }}>
+          <h2 style={sectionTitleStyle}>Темп</h2>
           <label htmlFor="pace" style={labelStyle}>
             Темп
             <input
@@ -864,6 +889,7 @@ export default function CreateRunPage() {
         </div>
 
         <div style={{ ...sectionStyle, ...sectionSpacingStyle }}>
+          <h2 style={sectionTitleStyle}>Место старта</h2>
           <label htmlFor="location_name" style={labelStyle}>
             Место
             <div ref={locationInputGroupRef} style={inputGroupStyle}>
@@ -921,19 +947,30 @@ export default function CreateRunPage() {
             </div>
           </label>
 
-          {isResolvingLocationName && (
-            <div style={secondaryTextStyle}>Определяем место старта...</div>
-          )}
+          <div style={locationStatusStyle}>{locationStatusText}</div>
           {locationLookupError && (
             <div style={{ color: '#b91c1c', fontSize: 14 }}>{locationLookupError}</div>
           )}
 
-          <div style={actionRowStyle}>
-            {!showMap && (
-              <button type="button" onClick={() => setShowMap(true)} style={secondaryButtonStyle}>
-                Выбрать на карте
-              </button>
+          <div style={mapBlockStyle}>
+            <button
+              type="button"
+              onClick={() => setShowMap((currentValue) => !currentValue)}
+              style={secondaryButtonStyle}
+            >
+              {showMap ? 'Скрыть карту' : '📍 Выбрать на карте'}
+            </button>
+
+            {showMap && (
+              <RunLocationPicker
+                apiKey={mapApiKey}
+                value={selectedCoordinates}
+                onChange={handleSelectedCoordinatesChange}
+              />
             )}
+          </div>
+
+          <div style={actionRowStyle}>
             <button
               type="button"
               onClick={useMyLocation}
@@ -953,29 +990,12 @@ export default function CreateRunPage() {
             )}
           </div>
 
-          {showMap && (
-            <RunLocationPicker
-              apiKey={mapApiKey}
-              value={selectedCoordinates}
-              onChange={handleSelectedCoordinatesChange}
-            />
-          )}
-
-          <div style={secondaryTextStyle}>
-            {selectedCoordinates
-              ? trimmedLocationName !== ''
-                ? `Выбрано: ${trimmedLocationName}`
-                : `Выбрано: ${selectedCoordinates.latitude.toFixed(5)}, ${selectedCoordinates.longitude.toFixed(5)}`
-              : 'Выберите место старта'}
-          </div>
-
           {geolocationError && <div style={{ color: '#b91c1c', fontSize: 14 }}>{geolocationError}</div>}
         </div>
       </form>
 
       <div style={stickyActionBarStyle}>
         <div style={stickyActionInnerStyle}>
-          {locationSubmitHint && <div style={{ ...secondaryTextStyle, marginBottom: 8 }}>{locationSubmitHint}</div>}
           <button
             type="submit"
             form="create-run-form"
