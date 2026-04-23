@@ -305,7 +305,7 @@ export default function Home() {
           const creatorGenderLabel = formatGenderLabel(run.creator_gender)
 
           return (
-            <div key={run.id} className="py-4 first:pt-0 last:pb-0">
+            <div key={run.id} className="py-3 first:pt-0 last:pb-0">
               <Card
                 size="sm"
                 className="gap-0 rounded-2xl border-border/70 py-0 shadow-sm transition-all duration-200 ease-out hover:border-border hover:shadow-md"
@@ -320,9 +320,9 @@ export default function Home() {
                   }
                 }}
               >
-                <CardHeader className="space-y-1 p-3 pb-1.5 sm:px-3.5">
+                <CardHeader className="space-y-0 p-2.5 pb-1 sm:px-3.5">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 space-y-0.5">
+                    <div className="min-w-0 space-y-0">
                       <CardTitle className="truncate text-[0.95rem] font-semibold leading-tight text-foreground sm:text-base">
                         {formatRunLocationName(run.location_name)}
                       </CardTitle>
@@ -338,18 +338,18 @@ export default function Home() {
                   </div>
                 </CardHeader>
 
-                <CardContent className="space-y-1.5 p-3 pt-0 sm:px-3.5">
-                  <div className="flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
-                    <div className="inline-flex h-5 items-center gap-1 rounded-full bg-primary/[0.06] px-2 py-0 font-medium text-foreground">
+                <CardContent className="space-y-1 p-2.5 pt-0 sm:px-3.5">
+                  <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[11px] text-muted-foreground">
+                    <div className="inline-flex h-[18px] items-center gap-1 rounded-md bg-primary/[0.06] px-1.5 font-medium text-foreground">
                       <Gauge className="size-3 text-primary" />
                       <span>{formatPace(run.pace_sec_per_km)}</span>
                     </div>
-                    <div className="inline-flex h-5 items-center gap-1 rounded-full bg-muted px-2 py-0 font-medium">
+                    <div className="inline-flex h-[18px] items-center gap-1 rounded-md bg-muted px-1.5 font-medium">
                       <Users className="size-3" />
                       <span>{run.participants_count} участ.</span>
                     </div>
                     {creatorGenderLabel ? (
-                      <div className="inline-flex h-5 items-center rounded-full bg-muted px-2 py-0 font-medium">
+                      <div className="inline-flex h-[18px] items-center rounded-md bg-muted px-1.5 font-medium">
                         <span>{creatorGenderLabel}</span>
                       </div>
                     ) : null}
@@ -403,10 +403,10 @@ export default function Home() {
                   </div>
                 </CardContent>
 
-                <CardFooter className="border-0 bg-transparent p-3 pt-1 sm:px-3.5">
+                <CardFooter className="border-0 bg-transparent p-2.5 pt-1 sm:px-3.5">
                   <Button
                     type="button"
-                    className="h-10 w-full rounded-xl px-3 text-[13px] font-semibold shadow-lg shadow-primary/20"
+                    className="h-9 w-full rounded-xl px-3 text-[13px] font-semibold shadow-lg shadow-primary/20"
                     onClick={(event) => {
                       event.stopPropagation()
                       void joinRun(run.id)
