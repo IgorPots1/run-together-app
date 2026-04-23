@@ -339,17 +339,17 @@ export default function Home() {
                 </CardHeader>
 
                 <CardContent className="space-y-1 p-2.5 pt-0 sm:px-3.5">
-                  <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[11px] text-muted-foreground">
-                    <div className="inline-flex h-[18px] items-center gap-1 rounded-md bg-primary/[0.06] px-1.5 font-medium text-foreground">
-                      <Gauge className="size-3 text-primary" />
+                  <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[12px] text-muted-foreground">
+                    <div className="inline-flex h-5 items-center gap-1 rounded-md bg-primary/[0.06] px-1.5 font-semibold text-foreground">
+                      <Gauge className="size-3.5 text-primary" />
                       <span>{formatPace(run.pace_sec_per_km)}</span>
                     </div>
-                    <div className="inline-flex h-[18px] items-center gap-1 rounded-md bg-muted px-1.5 font-medium">
-                      <Users className="size-3" />
+                    <div className="inline-flex h-5 items-center gap-1 rounded-md bg-muted px-1.5 font-semibold">
+                      <Users className="size-3.5" />
                       <span>{run.participants_count} участ.</span>
                     </div>
                     {creatorGenderLabel ? (
-                      <div className="inline-flex h-[18px] items-center rounded-md bg-muted px-1.5 font-medium">
+                      <div className="inline-flex h-5 items-center rounded-md bg-muted px-1.5 font-semibold">
                         <span>{creatorGenderLabel}</span>
                       </div>
                     ) : null}

@@ -731,7 +731,7 @@ export default function CreateRunPage() {
             description="Дата, время и длительность пробежки."
             className="max-w-full border-border/60 shadow-none"
           >
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2">
               <Field htmlFor="date" label="Дата">
                 <Input
                   id="date"
@@ -739,7 +739,7 @@ export default function CreateRunPage() {
                   value={date}
                   onChange={(event) => setDate(event.target.value)}
                   required
-                  className="w-full max-w-full bg-background"
+                  className="h-10 w-full max-w-full min-w-0 rounded-lg bg-background px-3 py-2 text-[15px] leading-4"
                 />
               </Field>
 
@@ -750,7 +750,7 @@ export default function CreateRunPage() {
                   value={time}
                   onChange={(event) => setTime(event.target.value)}
                   required
-                  className="w-full max-w-full bg-background"
+                  className="h-10 w-full max-w-full min-w-0 rounded-lg bg-background px-3 py-2 text-[15px] leading-4"
                 />
               </Field>
             </div>
