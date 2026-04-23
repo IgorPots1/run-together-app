@@ -1,53 +1,16 @@
 'use client'
 
-import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { AuthSplash } from '@/components/AuthSplash'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { PageContainer } from '@/components/ui/page-container'
 import { getAuthCallbackUrl } from '@/lib/appUrl'
 import { isProfileComplete } from '@/lib/profile'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuthProfile } from '@/lib/useAuthProfile'
-
-const pageStyle: CSSProperties = {
-  maxWidth: 520,
-  margin: '0 auto',
-  padding: 20,
-}
-
-const cardStyle: CSSProperties = {
-  border: '1px solid #d1d5db',
-  borderRadius: 12,
-  padding: 16,
-  marginBottom: 12,
-  backgroundColor: '#fff',
-}
-
-const formStyle: CSSProperties = {
-  ...cardStyle,
-  display: 'grid',
-  gap: 14,
-}
-
-const inputStyle: CSSProperties = {
-  width: '100%',
-  boxSizing: 'border-box',
-  padding: '10px 12px',
-  border: '1px solid #cbd5e1',
-  borderRadius: 8,
-  marginTop: 6,
-}
-
-const labelStyle: CSSProperties = {
-  display: 'block',
-  fontWeight: 600,
-  marginBottom: 0,
-}
-
-const secondaryTextStyle: CSSProperties = {
-  color: '#475569',
-  fontSize: 14,
-}
 
 function getAuthErrorMessage(message: string, fallbackMessage: string): string {
   const normalizedMessage = message.toLowerCase()
@@ -73,6 +36,68 @@ function getAuthErrorMessage(message: string, fallbackMessage: string): string {
 
 function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+function AuthShell({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description: string
+  children: ReactNode
+}) {
+  return (
+    <PageContainer className="justify-center gap-6 pb-10 pt-10">
+      <div className="space-y-3">
+        <div className="inline-flex rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
+          Run Together
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">{title}</h1>
+          <p className="max-w-[34ch] text-sm leading-6 text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      {children}
+    </PageContainer>
+  )
+}
+
+function AuthField({
+  htmlFor,
+  label,
+  children,
+}: {
+  htmlFor: string
+  label: string
+  children: ReactNode
+}) {
+  return (
+    <label htmlFor={htmlFor} className="block space-y-2">
+      <span className="text-sm font-medium text-foreground">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function AuthMessage({
+  tone,
+  children,
+}: {
+  tone: 'error' | 'info'
+  children: ReactNode
+}) {
+  return (
+    <div
+      className={
+        tone === 'error'
+          ? 'rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive'
+          : 'rounded-xl border border-emerald-200/60 bg-emerald-50 px-4 py-3 text-sm text-emerald-700'
+      }
+    >
+      {children}
+    </div>
+  )
 }
 
 export default function AuthPage() {
@@ -205,79 +230,97 @@ export default function AuthPage() {
 
   if (authProfileStatus === 'error' && session && profileError) {
     return (
-      <div style={pageStyle}>
-        <h1 style={{ marginBottom: 8 }}>Вход</h1>
-        <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
-          Войдите по email или через Google, чтобы продолжить.
-        </p>
-        <div style={cardStyle}>
-          <div style={{ marginBottom: 8, fontWeight: 600 }}>Не удалось загрузить профиль</div>
-          <div style={secondaryTextStyle}>Попробуйте загрузить данные ещё раз.</div>
-          <div style={{ marginTop: 12 }}>
-            <button type="button" onClick={reloadProfile}>
-              Повторить
-            </button>
+      <AuthShell
+        title="Войти"
+        description="Войдите по email или через Google, чтобы смотреть пробежки и создавать свои."
+      >
+        <section className="space-y-4 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold text-foreground">Не удалось загрузить профиль</h2>
+            <p className="text-sm text-muted-foreground">Попробуйте загрузить данные ещё раз.</p>
           </div>
-        </div>
-      </div>
+          <Button type="button" className="h-12 rounded-xl px-4" onClick={reloadProfile}>
+            Повторить
+          </Button>
+        </section>
+      </AuthShell>
     )
   }
 
   return (
-    <div style={pageStyle}>
-      <h1 style={{ marginBottom: 8 }}>Вход</h1>
-      <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
-        Войдите по email или через Google, чтобы продолжить.
-      </p>
-
-      <form onSubmit={signInWithEmail} style={formStyle}>
-        <h2 style={{ marginTop: 0, marginBottom: 8 }}>Вход или регистрация</h2>
-        <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 4 }}>
-          Используйте email и пароль или войдите через Google.
-        </p>
-
-        <label htmlFor="auth_email" style={labelStyle}>
-          Email
-          <input
-            id="auth_email"
-            type="email"
-            value={authEmail}
-            onChange={(event) => setAuthEmail(event.target.value)}
-            required
-            style={inputStyle}
-          />
-        </label>
-
-        <label htmlFor="auth_password" style={labelStyle}>
-          Пароль
-          <input
-            id="auth_password"
-            type="password"
-            value={authPassword}
-            onChange={(event) => setAuthPassword(event.target.value)}
-            required
-            style={inputStyle}
-          />
-        </label>
-
-        {authError && <div style={{ color: '#b91c1c', fontSize: 14 }}>{authError}</div>}
-        {authInfo && <div style={{ color: '#0f766e', fontSize: 14 }}>{authInfo}</div>}
-
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button type="submit" disabled={isSubmittingAuth}>
-            {isSubmittingAuth ? 'Выполняем вход...' : 'Войти по email'}
-          </button>
-          <button type="button" onClick={signUpWithEmail} disabled={isSubmittingAuth}>
-            Зарегистрироваться
-          </button>
+    <AuthShell
+      title="Войти"
+      description="Войдите по email или через Google, чтобы смотреть пробежки и создавать свои."
+    >
+      <form
+        onSubmit={signInWithEmail}
+        className="space-y-5 rounded-2xl border border-border/70 bg-card p-5 shadow-sm"
+      >
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold text-foreground">Продолжить с email</h2>
+          <p className="text-sm leading-6 text-muted-foreground">
+            Используйте email и пароль для входа или создайте новый аккаунт.
+          </p>
         </div>
-      </form>
 
-      <div style={cardStyle}>
-        <button type="button" onClick={signInWithGoogle} disabled={isSubmittingAuth}>
+        <div className="space-y-4">
+          <AuthField htmlFor="auth_email" label="Email">
+            <Input
+              id="auth_email"
+              type="email"
+              value={authEmail}
+              onChange={(event) => setAuthEmail(event.target.value)}
+              required
+              className="bg-background"
+            />
+          </AuthField>
+
+          <AuthField htmlFor="auth_password" label="Пароль">
+            <Input
+              id="auth_password"
+              type="password"
+              value={authPassword}
+              onChange={(event) => setAuthPassword(event.target.value)}
+              required
+              className="bg-background"
+            />
+          </AuthField>
+        </div>
+
+        {authError ? <AuthMessage tone="error">{authError}</AuthMessage> : null}
+        {authInfo ? <AuthMessage tone="info">{authInfo}</AuthMessage> : null}
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Button type="submit" disabled={isSubmittingAuth} className="h-12 rounded-xl text-sm font-semibold">
+            {isSubmittingAuth ? 'Выполняем вход...' : 'Войти'}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={signUpWithEmail}
+            disabled={isSubmittingAuth}
+            className="h-12 rounded-xl text-sm font-semibold"
+          >
+            Зарегистрироваться
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">или</span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          onClick={signInWithGoogle}
+          disabled={isSubmittingAuth}
+          className="h-12 w-full rounded-xl text-sm font-medium"
+        >
           Войти через Google
-        </button>
-      </div>
-    </div>
+        </Button>
+      </form>
+    </AuthShell>
   )
 }

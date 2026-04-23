@@ -106,31 +106,30 @@ function HomeShell({
   children: ReactNode
 }) {
   return (
-    <PageContainer className="gap-4 pb-10">
+    <PageContainer className="gap-5 pb-10">
       <header className="space-y-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-primary">Run Together</p>
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground">Пробежки</h1>
-            <p className="text-sm leading-6 text-muted-foreground">
-              Найдите компанию для пробежки или создайте свою.
+        <div className="flex flex-wrap items-center gap-3">
+          {email ? (
+            <p className="min-w-0 text-sm text-muted-foreground">
+              Вы вошли как <span className="break-all font-medium text-foreground">{email}</span>
             </p>
-          </div>
+          ) : null}
           <Button
             type="button"
             variant="ghost"
-            className="h-10 rounded-xl px-3 text-muted-foreground"
+            className="ml-auto h-10 rounded-xl px-3 text-muted-foreground"
             onClick={onSignOut}
           >
             <LogOut className="size-4" />
             Выйти
           </Button>
         </div>
-        {email ? (
-          <div className="rounded-xl border border-border/70 bg-card px-4 py-3 text-sm text-muted-foreground shadow-sm">
-            Вы вошли как <span className="font-medium text-foreground">{email}</span>
-          </div>
-        ) : null}
+        <div className="space-y-2">
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">Пробежки</h1>
+          <p className="max-w-[34ch] text-sm leading-6 text-muted-foreground">
+            Найдите компанию для пробежки или создайте свою.
+          </p>
+        </div>
       </header>
       {children}
     </PageContainer>

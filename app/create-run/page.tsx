@@ -292,27 +292,25 @@ function Field({
 function CreateRunPageShell({
   title,
   description,
-  email,
   onBack,
   onSignOut,
   children,
 }: {
   title: string
   description: string
-  email?: string
   onBack: () => void
   onSignOut: () => void
   children: ReactNode
 }) {
   return (
-    <PageContainer className="gap-4">
+    <PageContainer className="gap-5">
       <header className="space-y-4">
         <div className="flex items-center justify-between gap-3">
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className="h-10 rounded-xl px-3"
+            className="h-10 rounded-xl px-3 text-muted-foreground"
             onClick={onBack}
           >
             <ArrowLeft className="size-4" />
@@ -329,15 +327,9 @@ function CreateRunPageShell({
           </Button>
         </div>
         <div className="space-y-2">
-          <p className="text-sm font-medium text-primary">Новая пробежка</p>
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">{title}</h1>
-          <p className="text-sm leading-6 text-muted-foreground">{description}</p>
+          <p className="max-w-[36ch] text-sm leading-6 text-muted-foreground">{description}</p>
         </div>
-        {email ? (
-          <div className="rounded-xl border border-border/70 bg-card px-4 py-3 text-sm text-muted-foreground shadow-sm">
-            Вы вошли как <span className="font-medium text-foreground">{email}</span>
-          </div>
-        ) : null}
       </header>
       {children}
     </PageContainer>
@@ -675,7 +667,6 @@ export default function CreateRunPage() {
       <CreateRunPageShell
         title="Создать пробежку"
         description="Заполните данные о пробежке и выберите точку на карте."
-        email={session?.user.email}
         onBack={() => router.push('/')}
         onSignOut={signOut}
       >
@@ -694,7 +685,6 @@ export default function CreateRunPage() {
       <CreateRunPageShell
         title="Создать пробежку"
         description="Заполните данные о пробежке и выберите точку на карте."
-        email={session?.user.email}
         onBack={() => router.push('/')}
         onSignOut={signOut}
       >
@@ -710,21 +700,26 @@ export default function CreateRunPage() {
       <CreateRunPageShell
         title="Создать пробежку"
         description="Заполните ключевые детали, выберите место старта и опубликуйте пробежку для других участников."
-        email={session?.user.email}
         onBack={() => router.push('/')}
         onSignOut={signOut}
       >
         <form id="create-run-form" onSubmit={createRun} className="space-y-4">
-          <SectionBlock title="Основное" description="Дата, время и длительность пробежки.">
+          <SectionBlock
+            title="Основное"
+            description="Дата, время и длительность пробежки."
+            className="border-border/60 shadow-none"
+          >
             <Field htmlFor="time" label="Дата и время">
-              <Input
-                id="time"
-                type="datetime-local"
-                value={time}
-                onChange={(event) => setTime(event.target.value)}
-                required
-                className="bg-background"
-              />
+              <div className="overflow-hidden rounded-xl">
+                <Input
+                  id="time"
+                  type="datetime-local"
+                  value={time}
+                  onChange={(event) => setTime(event.target.value)}
+                  required
+                  className="h-12 w-full max-w-full min-w-0 overflow-hidden bg-background pr-3 text-[16px] [font-variant-numeric:tabular-nums] [&::-webkit-calendar-picker-indicator]:ml-2 [&::-webkit-date-and-time-value]:text-left [&::-webkit-datetime-edit]:block [&::-webkit-datetime-edit]:min-w-0 [&::-webkit-datetime-edit]:overflow-hidden [&::-webkit-datetime-edit]:p-0 [&::-webkit-datetime-edit-fields-wrapper]:min-w-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0"
+                />
+              </div>
             </Field>
 
             <Field htmlFor="duration_minutes" label="Длительность, минут">
@@ -741,7 +736,11 @@ export default function CreateRunPage() {
             </Field>
           </SectionBlock>
 
-          <SectionBlock title="Темп" description="Укажите целевой темп в формате мм:сс.">
+          <SectionBlock
+            title="Темп"
+            description="Укажите целевой темп в формате мм:сс."
+            className="border-border/60 shadow-none"
+          >
             <Field htmlFor="pace" label="Темп">
               <Input
                 id="pace"
@@ -780,7 +779,11 @@ export default function CreateRunPage() {
             ) : null}
           </SectionBlock>
 
-          <SectionBlock title="Место старта" description="Можно ввести адрес, выбрать точку на карте или использовать геолокацию.">
+          <SectionBlock
+            title="Место старта"
+            description="Можно ввести адрес, выбрать точку на карте или использовать геолокацию."
+            className="border-border/60 shadow-none"
+          >
             <Field htmlFor="location_name" label="Место">
               <div ref={locationInputGroupRef} className="relative">
                 <Input
