@@ -293,6 +293,20 @@ function Field({
   )
 }
 
+function combineDateAndTime(date: string, time: string): string | null {
+  if (date === '' || time === '') {
+    return null
+  }
+
+  const combinedDateTime = new Date(`${date}T${time}`)
+
+  if (Number.isNaN(combinedDateTime.getTime())) {
+    return null
+  }
+
+  return combinedDateTime.toISOString()
+}
+
 function CreateRunPageShell({
   title,
   description,
@@ -344,6 +358,7 @@ export default function CreateRunPage() {
   const router = useRouter()
   const { session, authProfileStatus, isBootstrapResolved, profile, profileError, reloadProfile } =
     useAuthProfile()
+  const [date, setDate] = useState('')
   const [time, setTime] = useState('')
   const [durationMinutes, setDurationMinutes] = useState('')
   const [pace, setPace] = useState('05:30')
@@ -366,6 +381,8 @@ export default function CreateRunPage() {
     !session ||
     !hasCompletedProfile ||
     !isPaceValid ||
+    !date ||
+    !time ||
     !selectedCoordinates ||
     isLocationNameEmpty ||
     isResolvingLocationName
@@ -405,8 +422,9 @@ export default function CreateRunPage() {
     }
 
     const paceSecPerKm = parsePaceInput(pace)
+    const runDateTimeIso = combineDateAndTime(date, time)
 
-    if (paceSecPerKm == null || selectedCoordinates == null) {
+    if (paceSecPerKm == null || selectedCoordinates == null || runDateTimeIso == null) {
       return
     }
 
@@ -418,7 +436,7 @@ export default function CreateRunPage() {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          time: new Date(time).toISOString(),
+          time: runDateTimeIso,
           duration_minutes: Number(durationMinutes),
           pace_sec_per_km: paceSecPerKm,
           location_name: locationName,
@@ -713,16 +731,29 @@ export default function CreateRunPage() {
             description="Дата, время и длительность пробежки."
             className="max-w-full border-border/60 shadow-none"
           >
-            <Field htmlFor="time" label="Дата и время">
-              <Input
-                id="time"
-                type="datetime-local"
-                value={time}
-                onChange={(event) => setTime(event.target.value)}
-                required
-                className="box-border w-full max-w-full bg-background"
-              />
-            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field htmlFor="date" label="Дата">
+                <Input
+                  id="date"
+                  type="date"
+                  value={date}
+                  onChange={(event) => setDate(event.target.value)}
+                  required
+                  className="w-full max-w-full bg-background"
+                />
+              </Field>
+
+              <Field htmlFor="time" label="Время">
+                <Input
+                  id="time"
+                  type="time"
+                  value={time}
+                  onChange={(event) => setTime(event.target.value)}
+                  required
+                  className="w-full max-w-full bg-background"
+                />
+              </Field>
+            </div>
 
             <Field htmlFor="duration_minutes" label="Длительность, минут">
               <Input
