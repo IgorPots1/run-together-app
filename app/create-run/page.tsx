@@ -51,7 +51,7 @@ type LocationSuggestion = {
 const pageStyle: CSSProperties = {
   maxWidth: 720,
   margin: '0 auto',
-  padding: 20,
+  padding: '24px 16px 120px',
 }
 
 const cardStyle: CSSProperties = {
@@ -122,9 +122,19 @@ const suggestionStatusStyle: CSSProperties = {
 }
 
 const formStyle: CSSProperties = {
+  display: 'grid',
+  gap: 0,
+}
+
+const sectionStyle: CSSProperties = {
   ...cardStyle,
   display: 'grid',
   gap: 14,
+  marginBottom: 0,
+}
+
+const sectionSpacingStyle: CSSProperties = {
+  marginTop: 28,
 }
 
 const chipListStyle: CSSProperties = {
@@ -140,10 +150,52 @@ const chipStyle: CSSProperties = {
   padding: '6px 10px',
   backgroundColor: '#fff',
   cursor: 'pointer',
+  fontWeight: 600,
 }
 
-const primaryButtonRowStyle: CSSProperties = {
-  marginTop: 4,
+const actionRowStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 8,
+  marginTop: 12,
+}
+
+const secondaryButtonStyle: CSSProperties = {
+  border: '1px solid #cbd5e1',
+  borderRadius: 10,
+  padding: '10px 14px',
+  backgroundColor: '#fff',
+  cursor: 'pointer',
+  fontWeight: 600,
+}
+
+const stickyActionBarStyle: CSSProperties = {
+  position: 'fixed',
+  left: 0,
+  right: 0,
+  bottom: 0,
+  padding: '12px 16px calc(12px + env(safe-area-inset-bottom, 0px))',
+  backgroundColor: 'rgba(255, 255, 255, 0.96)',
+  borderTop: '1px solid #e2e8f0',
+  boxShadow: '0 -8px 24px rgba(15, 23, 42, 0.08)',
+  backdropFilter: 'blur(10px)',
+}
+
+const stickyActionInnerStyle: CSSProperties = {
+  maxWidth: 720,
+  margin: '0 auto',
+}
+
+const primaryButtonStyle: CSSProperties = {
+  width: '100%',
+  border: 0,
+  borderRadius: 12,
+  padding: '14px 16px',
+  backgroundColor: '#2563eb',
+  color: '#fff',
+  fontSize: 16,
+  fontWeight: 700,
+  cursor: 'pointer',
 }
 
 const paceOptions = ['05:00', '05:30', '06:00', '06:30', '07:00']
@@ -367,9 +419,10 @@ export default function CreateRunPage() {
     useAuthProfile()
   const [time, setTime] = useState('')
   const [durationMinutes, setDurationMinutes] = useState('')
-  const [pace, setPace] = useState('')
+  const [pace, setPace] = useState('05:30')
   const [locationName, setLocationName] = useState('')
   const [selectedCoordinates, setSelectedCoordinates] = useState<RunCoordinates | null>(null)
+  const [showMap, setShowMap] = useState(false)
   const [isLocatingUser, setIsLocatingUser] = useState(false)
   const [geolocationError, setGeolocationError] = useState<string | null>(null)
   const [isResolvingLocationName, setIsResolvingLocationName] = useState(false)
@@ -389,11 +442,13 @@ export default function CreateRunPage() {
     !selectedCoordinates ||
     isLocationNameEmpty ||
     isResolvingLocationName
-  const locationSubmitHint = isResolvingLocationName
-    ? 'Создать пробежку можно после того, как место определится по карте.'
-    : selectedCoordinates && isLocationNameEmpty
-      ? 'Добавьте место вручную или через карту, чтобы создать пробежку.'
-      : null
+  const locationSubmitHint = !selectedCoordinates
+    ? 'Выберите место старта.'
+    : isResolvingLocationName
+      ? 'Определяем место старта...'
+      : isLocationNameEmpty
+        ? 'Укажите место старта.'
+        : null
   const shouldShowSplash =
     !isBootstrapResolved ||
     !session ||
@@ -731,9 +786,6 @@ export default function CreateRunPage() {
   return (
     <div style={pageStyle}>
       <h1 style={{ marginBottom: 8 }}>Создать пробежку</h1>
-      <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
-        Заполните данные о пробежке и выберите точку на карте.
-      </p>
 
       <div style={{ ...secondaryTextStyle, marginBottom: 16 }}>
         Вы вошли как {session.user.email}{' '}
@@ -742,47 +794,52 @@ export default function CreateRunPage() {
         </button>
       </div>
 
-      <form onSubmit={createRun} style={formStyle}>
-        <label htmlFor="time" style={labelStyle}>
-          Дата и время
-          <input
-            id="time"
-            type="datetime-local"
-            value={time}
-            onChange={(event) => setTime(event.target.value)}
-            required
-            style={inputStyle}
-          />
-        </label>
+      <form id="create-run-form" onSubmit={createRun} style={formStyle}>
+        <div style={sectionStyle}>
+          <label htmlFor="time" style={labelStyle}>
+            Дата и время
+            <input
+              id="time"
+              type="datetime-local"
+              value={time}
+              onChange={(event) => setTime(event.target.value)}
+              required
+              style={inputStyle}
+            />
+          </label>
 
-        <label htmlFor="duration_minutes" style={labelStyle}>
-          Длительность (мин)
-          <input
-            id="duration_minutes"
-            type="number"
-            min="1"
-            step="1"
-            value={durationMinutes}
-            onChange={(event) => setDurationMinutes(event.target.value)}
-            required
-            style={inputStyle}
-          />
-        </label>
+          <label htmlFor="duration_minutes" style={labelStyle}>
+            Длительность
+            <input
+              id="duration_minutes"
+              type="number"
+              min="1"
+              step="1"
+              value={durationMinutes}
+              onChange={(event) => setDurationMinutes(event.target.value)}
+              required
+              style={inputStyle}
+            />
+          </label>
+        </div>
 
-        <label htmlFor="pace" style={labelStyle}>
-          Темп
-          <input
-            id="pace"
-            type="text"
-            inputMode="numeric"
-            placeholder="05:30"
-            value={pace}
-            onChange={(event) => setPace(normalizePaceInput(event.target.value))}
-            onBlur={(event) => setPace(finalizePaceInput(event.target.value))}
-            required
-            aria-invalid={!isPaceValid}
-            style={inputStyle}
-          />
+        <div style={{ ...sectionStyle, ...sectionSpacingStyle }}>
+          <label htmlFor="pace" style={labelStyle}>
+            Темп
+            <input
+              id="pace"
+              type="text"
+              inputMode="numeric"
+              placeholder="05:30"
+              value={pace}
+              onChange={(event) => setPace(normalizePaceInput(event.target.value))}
+              onBlur={(event) => setPace(finalizePaceInput(event.target.value))}
+              required
+              aria-invalid={!isPaceValid}
+              style={inputStyle}
+            />
+          </label>
+
           <div style={chipListStyle}>
             {paceOptions.map((option) => (
               <button
@@ -792,130 +849,146 @@ export default function CreateRunPage() {
                 style={{
                   ...chipStyle,
                   borderColor: selectedPace === option ? '#2563eb' : '#cbd5e1',
-                  backgroundColor: selectedPace === option ? '#eff6ff' : chipStyle.backgroundColor,
+                  backgroundColor: selectedPace === option ? '#dbeafe' : chipStyle.backgroundColor,
+                  color: selectedPace === option ? '#1d4ed8' : '#0f172a',
                 }}
               >
                 {option}
               </button>
             ))}
           </div>
-        </label>
 
-        {!isPaceValid && (
-          <div style={{ color: '#b91c1c', fontSize: 14, marginTop: -4, marginBottom: 12 }}>
-            Введите темп в формате мм:сс, например 05:30.
-          </div>
-        )}
-
-        <label htmlFor="location_name" style={labelStyle}>
-          Место
-          <div ref={locationInputGroupRef} style={inputGroupStyle}>
-            <input
-              id="location_name"
-              type="text"
-              value={locationName}
-              onChange={(event) => {
-                setLocationName(event.target.value)
-                setLocationLookupError(null)
-                if (event.target.value.trim().length < 3) {
-                  setIsLoadingLocationSuggestions(false)
-                  setLocationSuggestions([])
-                }
-                setShowLocationSuggestions(true)
-              }}
-              onFocus={() => {
-                if (locationName.trim().length >= 3) {
-                  setShowLocationSuggestions(true)
-                } else {
-                  setIsLoadingLocationSuggestions(false)
-                }
-              }}
-              autoComplete="off"
-              required
-              style={inputStyle}
-            />
-            {showLocationSuggestions && (isLoadingLocationSuggestions || locationSuggestions.length > 0) && (
-              <ul style={suggestionsListStyle}>
-                {isLoadingLocationSuggestions && <li style={suggestionStatusStyle}>Ищем адрес...</li>}
-                {!isLoadingLocationSuggestions &&
-                  locationSuggestions.map((suggestion, index) => (
-                    <li key={`${suggestion.label}-${suggestion.latitude}-${suggestion.longitude}`}>
-                      <button
-                        type="button"
-                        onPointerDown={(event) => {
-                          event.preventDefault()
-                          selectLocationSuggestion(suggestion)
-                        }}
-                        style={{
-                          ...suggestionButtonStyle,
-                          borderBottom:
-                            index === locationSuggestions.length - 1
-                              ? '0'
-                              : suggestionButtonStyle.borderBottom,
-                        }}
-                      >
-                        {suggestion.label}
-                      </button>
-                    </li>
-                  ))}
-              </ul>
-            )}
-          </div>
-          {selectedCoordinates && isLocationNameEmpty && !isResolvingLocationName && (
-            <div style={{ ...secondaryTextStyle, marginTop: 6 }}>
-              Если адрес не подставился, укажите короткое название места вручную.
-            </div>
+          {!isPaceValid && (
+            <div style={{ color: '#b91c1c', fontSize: 14 }}>Введите темп в формате мм:сс.</div>
           )}
-          {isResolvingLocationName && (
-            <div style={{ ...secondaryTextStyle, marginTop: 6 }}>
-              Определяем короткое название места по выбранной точке...
+        </div>
+
+        <div style={{ ...sectionStyle, ...sectionSpacingStyle }}>
+          <label htmlFor="location_name" style={labelStyle}>
+            Место
+            <div ref={locationInputGroupRef} style={inputGroupStyle}>
+              <input
+                id="location_name"
+                type="text"
+                value={locationName}
+                onChange={(event) => {
+                  setLocationName(event.target.value)
+                  setLocationLookupError(null)
+                  if (event.target.value.trim().length < 3) {
+                    setIsLoadingLocationSuggestions(false)
+                    setLocationSuggestions([])
+                  }
+                  setShowLocationSuggestions(true)
+                }}
+                onFocus={() => {
+                  if (locationName.trim().length >= 3) {
+                    setShowLocationSuggestions(true)
+                  } else {
+                    setIsLoadingLocationSuggestions(false)
+                  }
+                }}
+                autoComplete="off"
+                required
+                style={inputStyle}
+              />
+              {showLocationSuggestions &&
+                (isLoadingLocationSuggestions || locationSuggestions.length > 0) && (
+                  <ul style={suggestionsListStyle}>
+                    {isLoadingLocationSuggestions && <li style={suggestionStatusStyle}>Ищем адрес...</li>}
+                    {!isLoadingLocationSuggestions &&
+                      locationSuggestions.map((suggestion, index) => (
+                        <li key={`${suggestion.label}-${suggestion.latitude}-${suggestion.longitude}`}>
+                          <button
+                            type="button"
+                            onPointerDown={(event) => {
+                              event.preventDefault()
+                              selectLocationSuggestion(suggestion)
+                            }}
+                            style={{
+                              ...suggestionButtonStyle,
+                              borderBottom:
+                                index === locationSuggestions.length - 1
+                                  ? '0'
+                                  : suggestionButtonStyle.borderBottom,
+                            }}
+                          >
+                            {suggestion.label}
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                )}
             </div>
+          </label>
+
+          {isResolvingLocationName && (
+            <div style={secondaryTextStyle}>Определяем место старта...</div>
           )}
           {locationLookupError && (
-            <div style={{ color: '#b91c1c', fontSize: 14, marginTop: 6 }}>{locationLookupError}</div>
+            <div style={{ color: '#b91c1c', fontSize: 14 }}>{locationLookupError}</div>
           )}
-        </label>
 
-        <div>
-          <div style={{ ...labelStyle, marginBottom: 8 }}>Точка на карте</div>
-          <RunLocationPicker
-            apiKey={mapApiKey}
-            value={selectedCoordinates}
-            onChange={handleSelectedCoordinatesChange}
-          />
-          <div style={{ marginTop: 8 }}>
-            <button type="button" onClick={useMyLocation} disabled={isLocatingUser}>
+          <div style={actionRowStyle}>
+            {!showMap && (
+              <button type="button" onClick={() => setShowMap(true)} style={secondaryButtonStyle}>
+                Выбрать на карте
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={useMyLocation}
+              disabled={isLocatingUser}
+              style={secondaryButtonStyle}
+            >
               {isLocatingUser ? 'Определяем геопозицию...' : 'Моя геопозиция'}
             </button>
+            {selectedCoordinates && (
+              <button
+                type="button"
+                onClick={() => handleSelectedCoordinatesChange(null)}
+                style={secondaryButtonStyle}
+              >
+                Очистить точку
+              </button>
+            )}
           </div>
-          <div style={{ ...secondaryTextStyle, marginTop: 8 }}>
+
+          {showMap && (
+            <RunLocationPicker
+              apiKey={mapApiKey}
+              value={selectedCoordinates}
+              onChange={handleSelectedCoordinatesChange}
+            />
+          )}
+
+          <div style={secondaryTextStyle}>
             {selectedCoordinates
               ? trimmedLocationName !== ''
                 ? `Выбрано: ${trimmedLocationName}`
                 : `Выбрано: ${selectedCoordinates.latitude.toFixed(5)}, ${selectedCoordinates.longitude.toFixed(5)}`
-              : 'Выберите одну точку на карте.'}
+              : 'Выберите место старта'}
           </div>
-          {geolocationError && (
-            <div style={{ color: '#b91c1c', fontSize: 14, marginTop: 8 }}>{geolocationError}</div>
-          )}
-          {selectedCoordinates && (
-            <div style={{ marginTop: 8 }}>
-              <button type="button" onClick={() => handleSelectedCoordinatesChange(null)}>
-                Очистить точку
-              </button>
-            </div>
-          )}
+
+          {geolocationError && <div style={{ color: '#b91c1c', fontSize: 14 }}>{geolocationError}</div>}
         </div>
+      </form>
 
-        <div style={secondaryTextStyle}>Выберите точку на карте перед созданием пробежки.</div>
-
-        <div style={primaryButtonRowStyle}>
+      <div style={stickyActionBarStyle}>
+        <div style={stickyActionInnerStyle}>
           {locationSubmitHint && <div style={{ ...secondaryTextStyle, marginBottom: 8 }}>{locationSubmitHint}</div>}
-          <button type="submit" disabled={isSubmitDisabled}>
+          <button
+            type="submit"
+            form="create-run-form"
+            disabled={isSubmitDisabled}
+            style={{
+              ...primaryButtonStyle,
+              opacity: isSubmitDisabled ? 0.7 : 1,
+            }}
+          >
             Создать пробежку
           </button>
         </div>
-      </form>
+      </div>
     </div>
   )
 }
