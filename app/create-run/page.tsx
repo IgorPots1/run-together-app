@@ -141,6 +141,10 @@ function finalizePaceInput(value: string): string {
   return `${String(minutesPart).padStart(2, '0')}:${String(secondsPart).padStart(2, '0')}`
 }
 
+function normalizeDurationInput(value: string): string {
+  return value.replace(/\D/g, '')
+}
+
 function normalizeLocationPart(value?: string): string | null {
   if (!value) {
     return null
@@ -723,11 +727,11 @@ export default function CreateRunPage() {
             <Field htmlFor="duration_minutes" label="Длительность, минут">
               <Input
                 id="duration_minutes"
-                type="number"
-                min="1"
-                step="1"
+                type="text"
+                inputMode="numeric"
+                pattern="[1-9][0-9]*"
                 value={durationMinutes}
-                onChange={(event) => setDurationMinutes(event.target.value)}
+                onChange={(event) => setDurationMinutes(normalizeDurationInput(event.target.value))}
                 required
                 className="w-full max-w-full bg-background"
               />
