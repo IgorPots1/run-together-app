@@ -281,7 +281,7 @@ function Field({
   hint?: string
 }) {
   return (
-    <label htmlFor={htmlFor} className="block space-y-2">
+    <label htmlFor={htmlFor} className="block max-w-full space-y-2">
       <span className="text-sm font-medium text-foreground">{label}</span>
       {children}
       {hint ? <span className="block text-sm text-muted-foreground">{hint}</span> : null}
@@ -703,21 +703,21 @@ export default function CreateRunPage() {
         onBack={() => router.push('/')}
         onSignOut={signOut}
       >
-        <form id="create-run-form" onSubmit={createRun} className="space-y-4">
+        <form id="create-run-form" onSubmit={createRun} className="w-full max-w-full space-y-4">
           <SectionBlock
             title="Основное"
             description="Дата, время и длительность пробежки."
-            className="border-border/60 shadow-none"
+            className="max-w-full border-border/60 shadow-none"
           >
             <Field htmlFor="time" label="Дата и время">
-              <div className="overflow-hidden rounded-xl">
+              <div className="max-w-full overflow-hidden rounded-xl">
                 <Input
                   id="time"
                   type="datetime-local"
                   value={time}
                   onChange={(event) => setTime(event.target.value)}
                   required
-                  className="h-12 w-full max-w-full min-w-0 overflow-hidden bg-background pr-3 text-[16px] [font-variant-numeric:tabular-nums] [&::-webkit-calendar-picker-indicator]:ml-2 [&::-webkit-date-and-time-value]:text-left [&::-webkit-datetime-edit]:block [&::-webkit-datetime-edit]:min-w-0 [&::-webkit-datetime-edit]:overflow-hidden [&::-webkit-datetime-edit]:p-0 [&::-webkit-datetime-edit-fields-wrapper]:min-w-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0"
+                  className="w-full max-w-full min-w-0 bg-background [font-variant-numeric:tabular-nums] [&::-webkit-calendar-picker-indicator]:ml-2 [&::-webkit-date-and-time-value]:text-left [&::-webkit-datetime-edit]:block [&::-webkit-datetime-edit]:min-w-0 [&::-webkit-datetime-edit]:overflow-hidden [&::-webkit-datetime-edit]:leading-5 [&::-webkit-datetime-edit-fields-wrapper]:min-w-0"
                 />
               </div>
             </Field>
@@ -731,7 +731,7 @@ export default function CreateRunPage() {
                 value={durationMinutes}
                 onChange={(event) => setDurationMinutes(event.target.value)}
                 required
-                className="bg-background"
+                className="w-full max-w-full bg-background"
               />
             </Field>
           </SectionBlock>
@@ -739,7 +739,7 @@ export default function CreateRunPage() {
           <SectionBlock
             title="Темп"
             description="Укажите целевой темп в формате мм:сс."
-            className="border-border/60 shadow-none"
+            className="max-w-full border-border/60 shadow-none"
           >
             <Field htmlFor="pace" label="Темп">
               <Input
@@ -752,7 +752,7 @@ export default function CreateRunPage() {
                 onBlur={(event) => setPace(finalizePaceInput(event.target.value))}
                 required
                 aria-invalid={!isPaceValid}
-                className="bg-background"
+                className="w-full max-w-full bg-background"
               />
             </Field>
 
@@ -782,10 +782,10 @@ export default function CreateRunPage() {
           <SectionBlock
             title="Место старта"
             description="Можно ввести адрес, выбрать точку на карте или использовать геолокацию."
-            className="border-border/60 shadow-none"
+            className="max-w-full border-border/60 shadow-none"
           >
             <Field htmlFor="location_name" label="Место">
-              <div ref={locationInputGroupRef} className="relative">
+              <div ref={locationInputGroupRef} className="relative max-w-full min-w-0">
                 <Input
                   id="location_name"
                   type="text"
@@ -808,11 +808,11 @@ export default function CreateRunPage() {
                   }}
                   autoComplete="off"
                   required
-                  className="bg-background"
+                  className="w-full max-w-full bg-background"
                 />
                 {showLocationSuggestions &&
                   (isLoadingLocationSuggestions || locationSuggestions.length > 0) && (
-                    <ul className="absolute inset-x-0 top-full z-10 mt-2 overflow-hidden rounded-xl border border-border bg-background shadow-lg">
+                    <ul className="absolute inset-x-0 top-full z-10 mt-2 max-h-60 max-w-full overflow-y-auto overscroll-contain rounded-xl border border-border bg-background shadow-lg">
                       {isLoadingLocationSuggestions ? (
                         <li className="px-4 py-3 text-sm text-muted-foreground">Ищем адрес...</li>
                       ) : (

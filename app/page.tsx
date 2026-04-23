@@ -80,18 +80,24 @@ function MetaItem({
   icon,
   label,
   value,
+  highlighted = false,
 }: {
   icon: ReactNode
   label: string
   value: string
+  highlighted?: boolean
 }) {
   return (
-    <div className="rounded-xl bg-muted/50 p-3">
-      <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+    <div
+      className={`rounded-xl border p-3.5 ${
+        highlighted ? 'border-primary/20 bg-primary/[0.05]' : 'border-border/60 bg-transparent'
+      }`}
+    >
+      <div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground/75">
         {icon}
         <span>{label}</span>
       </div>
-      <div className="text-sm font-medium text-foreground">{value}</div>
+      <div className="text-sm font-medium leading-6 text-foreground">{value}</div>
     </div>
   )
 }
@@ -292,7 +298,7 @@ export default function Home() {
         Создать пробежку
       </Button>
 
-      <section className="space-y-3">
+      <section className="space-y-4">
         {runs.length === 0 ? (
           <SectionBlock>
             <p className="text-sm text-muted-foreground">Пока нет пробежек.</p>
@@ -300,34 +306,36 @@ export default function Home() {
         ) : null}
 
         {runs.map((run) => (
-          <Card key={run.id} className="rounded-xl">
-            <CardHeader className="space-y-3">
+          <Card key={run.id} className="rounded-2xl border-border/70 shadow-sm">
+            <CardHeader className="space-y-4 pb-2">
               <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <CardTitle className="text-lg font-semibold text-foreground">
+                <div className="space-y-2">
+                  <CardTitle className="text-xl font-bold leading-tight text-foreground">
                     {formatRunLocationName(run.location_name)}
                   </CardTitle>
-                  <CardDescription className="text-sm text-muted-foreground">
+                  <CardDescription className="text-xs leading-5 text-muted-foreground/80">
                     {formatRunDateTime(run.time)}
                   </CardDescription>
                 </div>
-                <div className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                <div className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
                   {run.participants_count} участ.
                 </div>
               </div>
             </CardHeader>
 
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6 pt-2">
               <div className="grid grid-cols-2 gap-3">
                 <MetaItem
                   icon={<CalendarDays className="size-3.5" />}
                   label="Время"
                   value={formatRunDateTime(run.time)}
+                  highlighted
                 />
                 <MetaItem
                   icon={<Gauge className="size-3.5" />}
                   label="Темп"
                   value={formatPace(run.pace_sec_per_km)}
+                  highlighted
                 />
                 <MetaItem
                   icon={<MapPin className="size-3.5" />}
@@ -341,7 +349,7 @@ export default function Home() {
                 />
               </div>
 
-              <div className="space-y-2 text-sm text-muted-foreground">
+              <div className="space-y-3 text-sm leading-6 text-muted-foreground/80">
                 <p>
                   <span className="font-medium text-foreground">Создал:</span> {formatCreatorName(run)}
                 </p>
@@ -376,10 +384,10 @@ export default function Home() {
               </div>
             </CardContent>
 
-            <CardFooter className="border-t-0 bg-transparent p-4 pt-0">
+            <CardFooter className="border-t-0 bg-transparent p-6 pt-1">
               <Button
                 type="button"
-                className="h-11 w-full rounded-xl"
+                className="h-12 w-full rounded-xl text-base font-semibold shadow-lg shadow-primary/25"
                 onClick={() => joinRun(run.id)}
               >
                 <TimerReset className="size-4" />
