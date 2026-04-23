@@ -319,13 +319,13 @@ export default function Home() {
                   }
                 }}
               >
-                <CardHeader className="space-y-3 p-5 pb-3">
+                <CardHeader className="space-y-2 p-4 pb-2.5">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 space-y-1">
-                      <CardTitle className="truncate text-lg font-semibold leading-tight text-foreground">
+                    <div className="min-w-0 space-y-0.5">
+                      <CardTitle className="truncate text-base font-semibold leading-tight text-foreground sm:text-[1.05rem]">
                         {formatRunLocationName(run.location_name)}
                       </CardTitle>
-                      <CardDescription className="truncate text-sm text-muted-foreground">
+                      <CardDescription className="truncate text-[13px] text-muted-foreground">
                         {formatRunDateTime(run.time)}
                       </CardDescription>
                     </div>
@@ -337,18 +337,18 @@ export default function Home() {
                   </div>
                 </CardHeader>
 
-                <CardContent className="space-y-3 p-5 pt-0">
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                    <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/[0.06] px-3 py-1 font-medium text-foreground">
+                <CardContent className="space-y-2.5 p-4 pt-0">
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                    <div className="inline-flex items-center gap-1 rounded-full bg-primary/[0.06] px-2.5 py-0.5 font-medium text-foreground">
                       <Gauge className="size-3.5 text-primary" />
                       <span>{formatPace(run.pace_sec_per_km)}</span>
                     </div>
-                    <div className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 font-medium">
+                    <div className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 font-medium">
                       <Users className="size-3.5" />
                       <span>{run.participants_count} участ.</span>
                     </div>
                     {creatorGenderLabel ? (
-                      <div className="inline-flex items-center rounded-full bg-muted px-3 py-1 font-medium">
+                      <div className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 font-medium">
                         <span>{creatorGenderLabel}</span>
                       </div>
                     ) : null}
@@ -362,7 +362,7 @@ export default function Home() {
                     <div className="min-h-0">
                       <div
                         className={`overflow-hidden text-sm leading-6 text-muted-foreground transition-all duration-300 ease-out ${
-                          isExpanded ? 'mt-1 border-t border-border/60 pt-3' : 'mt-0 pt-0'
+                          isExpanded ? 'mt-0.5 border-t border-border/60 pt-2.5' : 'mt-0 pt-0'
                         }`}
                         onClick={(event) => event.stopPropagation()}
                       >
@@ -402,7 +402,7 @@ export default function Home() {
                   </div>
                 </CardContent>
 
-                <CardFooter className="bg-transparent p-5 pt-0">
+                <CardFooter className="border-0 bg-transparent p-4 pt-1.5">
                   <Button
                     type="button"
                     className="h-11 w-full rounded-xl text-sm font-semibold shadow-lg shadow-primary/20"
