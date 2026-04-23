@@ -1,6 +1,6 @@
 export const profileSelect = 'id, created_at, updated_at, name, nickname, city, gender'
 
-export const profileGenders = ['male', 'female', 'prefer_not_to_say'] as const
+export const profileGenders = ['male', 'female'] as const
 
 export type ProfileGender = (typeof profileGenders)[number]
 
