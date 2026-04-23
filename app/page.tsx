@@ -1,9 +1,21 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { CalendarDays, Gauge, LogOut, MapPin, Plus, TimerReset, Users } from 'lucide-react'
 
 import { AuthSplash } from '@/components/AuthSplash'
+import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { PageContainer } from '@/components/ui/page-container'
+import { SectionBlock } from '@/components/ui/section-block'
 import { getProfileDisplayName, isProfileComplete } from '@/lib/profile'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuthProfile } from '@/lib/useAuthProfile'
@@ -29,44 +41,6 @@ type Run = {
   participants_count: number
   last_joined_user_name: string | null
   last_joined_at: string | null
-}
-
-const pageStyle: CSSProperties = {
-  maxWidth: 720,
-  margin: '0 auto',
-  padding: 20,
-}
-
-const cardStyle: CSSProperties = {
-  border: '1px solid #d1d5db',
-  borderRadius: 12,
-  padding: 16,
-  marginBottom: 12,
-  backgroundColor: '#fff',
-}
-
-const secondaryTextStyle: CSSProperties = {
-  color: '#475569',
-  fontSize: 14,
-}
-
-const ctaRowStyle: CSSProperties = {
-  marginBottom: 20,
-}
-
-const runMetaRowStyle: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 12,
-  marginTop: 12,
-  marginBottom: 12,
-  fontSize: 14,
-}
-
-const mapActionLinkStyle: CSSProperties = {
-  color: '#2563eb',
-  textDecoration: 'none',
-  fontWeight: 600,
 }
 
 function formatPace(seconds: number | null): string {
@@ -100,6 +74,67 @@ function formatRunLocationName(locationName: string): string {
   const normalizedLocationName = locationName.trim()
 
   return normalizedLocationName === '' ? 'Точка на карте выбрана' : normalizedLocationName
+}
+
+function MetaItem({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode
+  label: string
+  value: string
+}) {
+  return (
+    <div className="rounded-xl bg-muted/50 p-3">
+      <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {icon}
+        <span>{label}</span>
+      </div>
+      <div className="text-sm font-medium text-foreground">{value}</div>
+    </div>
+  )
+}
+
+function HomeShell({
+  email,
+  onSignOut,
+  children,
+}: {
+  email?: string
+  onSignOut: () => void
+  children: ReactNode
+}) {
+  return (
+    <PageContainer className="gap-4 pb-10">
+      <header className="space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-primary">Run Together</p>
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">Пробежки</h1>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Найдите компанию для пробежки или создайте свою.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-10 rounded-xl px-3 text-muted-foreground"
+            onClick={onSignOut}
+          >
+            <LogOut className="size-4" />
+            Выйти
+          </Button>
+        </div>
+        {email ? (
+          <div className="rounded-xl border border-border/70 bg-card px-4 py-3 text-sm text-muted-foreground shadow-sm">
+            Вы вошли как <span className="font-medium text-foreground">{email}</span>
+          </div>
+        ) : null}
+      </header>
+      {children}
+    </PageContainer>
+  )
 }
 
 export default function Home() {
@@ -226,130 +261,135 @@ export default function Home() {
 
   if (authProfileStatus === 'error' && profileError) {
     return (
-      <div style={pageStyle}>
-        <h1 style={{ marginBottom: 8 }}>Пробежки</h1>
-        <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
-          Найдите компанию для пробежки или создайте свою.
-        </p>
-        <div style={{ ...secondaryTextStyle, marginBottom: 16 }}>
-          Вы вошли как {session.user.email}{' '}
-          <button type="button" onClick={signOut}>
-            Выйти
-          </button>
-        </div>
-        <div style={cardStyle}>
-          <div style={{ marginBottom: 8, fontWeight: 600 }}>Не удалось загрузить профиль</div>
-          <div style={secondaryTextStyle}>Попробуйте загрузить данные ещё раз.</div>
-          <div style={{ marginTop: 12 }}>
-            <button type="button" onClick={reloadProfile}>
-              Повторить
-            </button>
-          </div>
-        </div>
-      </div>
+      <HomeShell email={session?.user.email} onSignOut={signOut}>
+        <SectionBlock title="Не удалось загрузить профиль">
+          <p className="text-sm text-muted-foreground">Попробуйте загрузить данные ещё раз.</p>
+          <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={reloadProfile}>
+            Повторить
+          </Button>
+        </SectionBlock>
+      </HomeShell>
     )
   }
 
   if (!hasCompletedProfile) {
     return (
-      <div style={pageStyle}>
-        <h1 style={{ marginBottom: 8 }}>Пробежки</h1>
-        <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
-          Найдите компанию для пробежки или создайте свою.
-        </p>
-        <div style={{ ...secondaryTextStyle, marginBottom: 16 }}>
-          Вы вошли как {session.user.email}{' '}
-          <button type="button" onClick={signOut}>
-            Выйти
-          </button>
-        </div>
-        <div style={{ ...cardStyle, ...secondaryTextStyle }}>Перенаправляем на заполнение профиля...</div>
-      </div>
+      <HomeShell email={session?.user.email} onSignOut={signOut}>
+        <SectionBlock>
+          <p className="text-sm text-muted-foreground">Перенаправляем на заполнение профиля...</p>
+        </SectionBlock>
+      </HomeShell>
     )
   }
 
   return (
-    <div style={pageStyle}>
-      <h1 style={{ marginBottom: 8 }}>Пробежки</h1>
-      <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
-        Найдите компанию для пробежки или создайте свою.
-      </p>
+    <HomeShell email={session?.user.email} onSignOut={signOut}>
+      <Button
+        type="button"
+        className="h-12 w-full rounded-2xl text-base font-semibold shadow-lg shadow-primary/20"
+        onClick={() => router.push('/create-run')}
+      >
+        <Plus className="size-5" />
+        Создать пробежку
+      </Button>
 
-      <div style={{ ...secondaryTextStyle, marginBottom: 16 }}>
-        Вы вошли как {session.user.email}{' '}
-        <button type="button" onClick={signOut}>
-          Выйти
-        </button>
-      </div>
+      <section className="space-y-3">
+        {runs.length === 0 ? (
+          <SectionBlock>
+            <p className="text-sm text-muted-foreground">Пока нет пробежек.</p>
+          </SectionBlock>
+        ) : null}
 
-      <div style={ctaRowStyle}>
-        <button type="button" onClick={() => router.push('/create-run')}>
-          Создать пробежку
-        </button>
-      </div>
+        {runs.map((run) => (
+          <Card key={run.id} className="rounded-xl">
+            <CardHeader className="space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle className="text-lg font-semibold text-foreground">
+                    {formatRunLocationName(run.location_name)}
+                  </CardTitle>
+                  <CardDescription className="text-sm text-muted-foreground">
+                    {formatRunDateTime(run.time)}
+                  </CardDescription>
+                </div>
+                <div className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  {run.participants_count} участ.
+                </div>
+              </div>
+            </CardHeader>
 
-      {runs.length === 0 && <div style={cardStyle}>Пока нет пробежек</div>}
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <MetaItem
+                  icon={<CalendarDays className="size-3.5" />}
+                  label="Время"
+                  value={formatRunDateTime(run.time)}
+                />
+                <MetaItem
+                  icon={<Gauge className="size-3.5" />}
+                  label="Темп"
+                  value={formatPace(run.pace_sec_per_km)}
+                />
+                <MetaItem
+                  icon={<MapPin className="size-3.5" />}
+                  label="Локация"
+                  value={formatRunLocationName(run.location_name)}
+                />
+                <MetaItem
+                  icon={<Users className="size-3.5" />}
+                  label="Участники"
+                  value={String(run.participants_count)}
+                />
+              </div>
 
-      {runs.map((run) => (
-        <div key={run.id} style={cardStyle}>
-          <div>
-            <h3 style={{ marginTop: 0, marginBottom: 4 }}>{formatRunLocationName(run.location_name)}</h3>
-            <div style={secondaryTextStyle}>{formatRunDateTime(run.time)}</div>
-          </div>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  <span className="font-medium text-foreground">Создал:</span> {formatCreatorName(run)}
+                </p>
+                <p>
+                  <span className="font-medium text-foreground">Длительность:</span>{' '}
+                  {run.duration_minutes ?? 'Не указана'} мин
+                </p>
+                <p>
+                  <span className="font-medium text-foreground">Состав:</span>{' '}
+                  {run.participants.length > 0
+                    ? run.participants.map((participant) => formatParticipantName(participant)).join(', ')
+                    : 'Пока никто не присоединился'}
+                </p>
+                {run.latitude != null && run.longitude != null ? (
+                  <p>
+                    <a
+                      href={build2GisUrl(run.latitude, run.longitude)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium text-primary hover:underline"
+                    >
+                      Открыть точку на карте
+                    </a>
+                  </p>
+                ) : null}
+                {run.last_joined_user_name ? (
+                  <p>Недавно присоединился: {run.last_joined_user_name}</p>
+                ) : null}
+                {!run.last_joined_user_name && run.last_joined_at ? (
+                  <p>Недавно присоединился ещё один участник</p>
+                ) : null}
+              </div>
+            </CardContent>
 
-          <div style={runMetaRowStyle}>
-            <div>
-              <strong>Длительность:</strong> {run.duration_minutes ?? 'Не указана'} мин
-            </div>
-            <div>
-              <strong>Темп:</strong> {formatPace(run.pace_sec_per_km)}
-            </div>
-          </div>
-
-          <div style={{ ...secondaryTextStyle, marginBottom: 6 }}>
-            <strong style={{ color: '#0f172a' }}>Создал:</strong> {formatCreatorName(run)}
-          </div>
-
-          <div style={{ ...secondaryTextStyle, marginBottom: 12 }}>
-            <strong style={{ color: '#0f172a' }}>Участники:</strong> {run.participants_count}
-            {run.participants.length > 0
-              ? ` · ${run.participants.map((participant) => formatParticipantName(participant)).join(', ')}`
-              : ' · Пока никто не присоединился'}
-          </div>
-
-          {run.latitude != null && run.longitude != null && (
-            <div style={{ ...secondaryTextStyle, marginBottom: 12 }}>
-              <strong style={{ color: '#0f172a' }}>Адрес:</strong> {formatRunLocationName(run.location_name)} ·{' '}
-              <a
-                href={build2GisUrl(run.latitude, run.longitude)}
-                target="_blank"
-                rel="noreferrer"
-                style={mapActionLinkStyle}
+            <CardFooter className="border-t-0 bg-transparent p-4 pt-0">
+              <Button
+                type="button"
+                className="h-11 w-full rounded-xl"
+                onClick={() => joinRun(run.id)}
               >
-                Открыть на карте
-              </a>
-            </div>
-          )}
-
-          {run.last_joined_user_name && (
-            <div style={{ ...secondaryTextStyle, marginBottom: 12 }}>
-              Недавно присоединился: {run.last_joined_user_name}
-            </div>
-          )}
-
-          {!run.last_joined_user_name && run.last_joined_at && (
-            <div style={{ ...secondaryTextStyle, marginBottom: 12 }}>
-              Недавно присоединился ещё один участник
-            </div>
-          )}
-
-          <div style={{ marginTop: 16 }}>
-            <button type="button" onClick={() => joinRun(run.id)}>
-              Присоединиться
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
+                <TimerReset className="size-4" />
+                Присоединиться
+              </Button>
+            </CardFooter>
+          </Card>
+        ))}
+      </section>
+    </HomeShell>
   )
 }

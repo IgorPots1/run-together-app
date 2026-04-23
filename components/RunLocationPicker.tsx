@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 
 type Coordinates = {
   latitude: number
@@ -49,24 +49,6 @@ declare global {
   interface Window {
     mapgl?: MapGlApi
   }
-}
-
-const mapShellStyle: CSSProperties = {
-  border: '1px solid #cbd5e1',
-  borderRadius: 12,
-  overflow: 'hidden',
-  backgroundColor: '#f8fafc',
-}
-
-const mapContainerStyle: CSSProperties = {
-  width: '100%',
-  height: 260,
-}
-
-const helperTextStyle: CSSProperties = {
-  color: '#475569',
-  fontSize: 14,
-  padding: '10px 12px 12px',
 }
 
 const defaultCenter: [number, number] = [37.618423, 55.751244]
@@ -244,8 +226,8 @@ export default function RunLocationPicker({
 
   if (!apiKey) {
     return (
-      <div style={mapShellStyle}>
-        <div style={helperTextStyle}>
+      <div className="overflow-hidden rounded-xl border border-dashed border-border bg-muted/30">
+        <div className="px-4 py-3 text-sm text-muted-foreground">
           Добавьте переменную окружения NEXT_PUBLIC_2GIS_MAP_KEY, чтобы выбрать точку на карте.
         </div>
       </div>
@@ -253,16 +235,20 @@ export default function RunLocationPicker({
   }
 
   return (
-    <div style={mapShellStyle}>
-      <div id={mapId} style={mapContainerStyle} />
+    <div className="overflow-hidden rounded-xl border border-border/70 bg-muted/30">
+      <div id={mapId} className="h-[260px] w-full" />
       {status === 'loading' && (
-        <div style={helperTextStyle}>Загружаем карту 2GIS...</div>
+        <div className="px-4 py-3 text-sm text-muted-foreground">Загружаем карту 2GIS...</div>
       )}
       {status === 'error' && (
-        <div style={helperTextStyle}>Не удалось загрузить карту. Попробуйте обновить страницу.</div>
+        <div className="px-4 py-3 text-sm text-muted-foreground">
+          Не удалось загрузить карту. Попробуйте обновить страницу.
+        </div>
       )}
       {status === 'ready' && (
-        <div style={helperTextStyle}>Кликните по карте, чтобы выбрать место старта.</div>
+        <div className="px-4 py-3 text-sm text-muted-foreground">
+          Кликните по карте, чтобы выбрать место старта.
+        </div>
       )}
     </div>
   )

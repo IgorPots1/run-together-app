@@ -1,25 +1,7 @@
 'use client'
 
-import type { CSSProperties } from 'react'
-
-const splashStyle: CSSProperties = {
-  minHeight: '100vh',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: 24,
-}
-
-const cardStyle: CSSProperties = {
-  width: '100%',
-  maxWidth: 320,
-  padding: '18px 20px',
-  border: '1px solid #d1d5db',
-  borderRadius: 16,
-  backgroundColor: '#fff',
-  color: '#475569',
-  textAlign: 'center',
-}
+import { Card, CardContent } from '@/components/ui/card'
+import { PageContainer } from '@/components/ui/page-container'
 
 type AuthSplashProps = {
   message?: string
@@ -27,8 +9,12 @@ type AuthSplashProps = {
 
 export function AuthSplash({ message = 'Загружаем...' }: AuthSplashProps) {
   return (
-    <div style={splashStyle}>
-      <div style={cardStyle}>{message}</div>
-    </div>
+    <PageContainer className="items-center justify-center pb-6">
+      <Card className="w-full max-w-sm rounded-2xl">
+        <CardContent className="px-5 py-6 text-center text-sm text-muted-foreground">
+          {message}
+        </CardContent>
+      </Card>
+    </PageContainer>
   )
 }

@@ -2,9 +2,15 @@
 
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { ArrowLeft, LocateFixed, LogOut, MapPinned, TimerReset, X } from 'lucide-react'
 
 import { AuthSplash } from '@/components/AuthSplash'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { PageContainer } from '@/components/ui/page-container'
+import { SectionBlock } from '@/components/ui/section-block'
+import { cn } from '@/lib/utils'
 import { isProfileComplete } from '@/lib/profile'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuthProfile } from '@/lib/useAuthProfile'
@@ -46,179 +52,6 @@ type LocationSuggestion = {
   label: string
   latitude: number
   longitude: number
-}
-
-const pageStyle: CSSProperties = {
-  maxWidth: 720,
-  margin: '0 auto',
-  padding: '24px 16px 120px',
-}
-
-const cardStyle: CSSProperties = {
-  border: '1px solid #d1d5db',
-  borderRadius: 16,
-  padding: 24,
-  marginBottom: 12,
-  backgroundColor: '#fff',
-}
-
-const inputStyle: CSSProperties = {
-  width: '100%',
-  boxSizing: 'border-box',
-  minHeight: 52,
-  padding: '14px 16px',
-  border: '1px solid #cbd5e1',
-  borderRadius: 10,
-  marginTop: 8,
-  fontSize: 16,
-}
-
-const labelStyle: CSSProperties = {
-  display: 'block',
-  fontWeight: 600,
-  marginBottom: 0,
-}
-
-const secondaryTextStyle: CSSProperties = {
-  color: '#475569',
-  fontSize: 14,
-}
-
-const inputGroupStyle: CSSProperties = {
-  position: 'relative',
-}
-
-const suggestionsListStyle: CSSProperties = {
-  position: 'absolute',
-  top: '100%',
-  left: 0,
-  right: 0,
-  zIndex: 10,
-  marginTop: 6,
-  padding: 0,
-  listStyle: 'none',
-  border: '1px solid #cbd5e1',
-  borderRadius: 12,
-  backgroundColor: '#fff',
-  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.12)',
-  overflow: 'hidden',
-}
-
-const suggestionButtonStyle: CSSProperties = {
-  width: '100%',
-  padding: '12px',
-  border: 0,
-  borderBottom: '1px solid #e2e8f0',
-  backgroundColor: '#fff',
-  textAlign: 'left',
-  fontSize: 15,
-  lineHeight: 1.4,
-  cursor: 'pointer',
-}
-
-const suggestionStatusStyle: CSSProperties = {
-  padding: '12px',
-  fontSize: 14,
-  color: '#475569',
-  backgroundColor: '#fff',
-}
-
-const formStyle: CSSProperties = {
-  display: 'grid',
-  gap: 0,
-}
-
-const sectionTitleStyle: CSSProperties = {
-  margin: 0,
-  fontSize: 18,
-  fontWeight: 700,
-  color: '#0f172a',
-}
-
-const sectionStyle: CSSProperties = {
-  ...cardStyle,
-  display: 'grid',
-  gap: 18,
-  marginBottom: 0,
-}
-
-const sectionSpacingStyle: CSSProperties = {
-  marginTop: 28,
-}
-
-const chipListStyle: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 8,
-  marginTop: 10,
-}
-
-const chipStyle: CSSProperties = {
-  border: '1px solid #cbd5e1',
-  borderRadius: 999,
-  padding: '6px 10px',
-  backgroundColor: '#fff',
-  cursor: 'pointer',
-  fontWeight: 600,
-}
-
-const actionRowStyle: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 12,
-  marginTop: 4,
-}
-
-const secondaryButtonStyle: CSSProperties = {
-  border: '1px solid #cbd5e1',
-  borderRadius: 10,
-  minHeight: 48,
-  padding: '12px 16px',
-  backgroundColor: 'transparent',
-  cursor: 'pointer',
-  fontWeight: 600,
-  color: '#334155',
-}
-
-const stickyActionBarStyle: CSSProperties = {
-  position: 'fixed',
-  left: 0,
-  right: 0,
-  bottom: 0,
-  padding: '12px 16px calc(12px + env(safe-area-inset-bottom, 0px))',
-  backgroundColor: 'rgba(255, 255, 255, 0.96)',
-  borderTop: '1px solid #e2e8f0',
-  boxShadow: '0 -8px 24px rgba(15, 23, 42, 0.08)',
-  backdropFilter: 'blur(10px)',
-}
-
-const stickyActionInnerStyle: CSSProperties = {
-  maxWidth: 720,
-  margin: '0 auto',
-}
-
-const primaryButtonStyle: CSSProperties = {
-  width: '100%',
-  border: 0,
-  minHeight: 56,
-  borderRadius: 14,
-  padding: '16px 20px',
-  backgroundColor: '#2563eb',
-  color: '#fff',
-  fontSize: 17,
-  fontWeight: 700,
-  cursor: 'pointer',
-  boxShadow: '0 10px 24px rgba(37, 99, 235, 0.28)',
-}
-
-const locationStatusStyle: CSSProperties = {
-  ...secondaryTextStyle,
-  minHeight: 20,
-}
-
-const mapBlockStyle: CSSProperties = {
-  display: 'grid',
-  gap: 12,
 }
 
 const paceOptions = ['05:00', '05:30', '06:00', '06:30', '07:00']
@@ -434,6 +267,81 @@ function buildSuggestionFromItem(item: GeocodeSearchItem): LocationSuggestion | 
     latitude: item.point.lat,
     longitude: item.point.lon,
   }
+}
+
+function Field({
+  htmlFor,
+  label,
+  children,
+  hint,
+}: {
+  htmlFor: string
+  label: string
+  children: ReactNode
+  hint?: string
+}) {
+  return (
+    <label htmlFor={htmlFor} className="block space-y-2">
+      <span className="text-sm font-medium text-foreground">{label}</span>
+      {children}
+      {hint ? <span className="block text-sm text-muted-foreground">{hint}</span> : null}
+    </label>
+  )
+}
+
+function CreateRunPageShell({
+  title,
+  description,
+  email,
+  onBack,
+  onSignOut,
+  children,
+}: {
+  title: string
+  description: string
+  email?: string
+  onBack: () => void
+  onSignOut: () => void
+  children: ReactNode
+}) {
+  return (
+    <PageContainer className="gap-4">
+      <header className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-10 rounded-xl px-3"
+            onClick={onBack}
+          >
+            <ArrowLeft className="size-4" />
+            Назад
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-10 rounded-xl px-3 text-muted-foreground"
+            onClick={onSignOut}
+          >
+            <LogOut className="size-4" />
+            Выйти
+          </Button>
+        </div>
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-primary">Новая пробежка</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">{title}</h1>
+          <p className="text-sm leading-6 text-muted-foreground">{description}</p>
+        </div>
+        {email ? (
+          <div className="rounded-xl border border-border/70 bg-card px-4 py-3 text-sm text-muted-foreground shadow-sm">
+            Вы вошли как <span className="font-medium text-foreground">{email}</span>
+          </div>
+        ) : null}
+      </header>
+      {children}
+    </PageContainer>
+  )
 }
 
 export default function CreateRunPage() {
@@ -764,251 +672,242 @@ export default function CreateRunPage() {
 
   if (authProfileStatus === 'error' && profileError) {
     return (
-      <div style={pageStyle}>
-        <h1 style={{ marginBottom: 8 }}>Создать пробежку</h1>
-        <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
-          Заполните данные о пробежке и выберите точку на карте.
-        </p>
-        <div style={{ ...secondaryTextStyle, marginBottom: 16 }}>
-          Вы вошли как {session.user.email}{' '}
-          <button type="button" onClick={signOut}>
-            Выйти
-          </button>
-        </div>
-        <div style={cardStyle}>
-          <div style={{ marginBottom: 8, fontWeight: 600 }}>Не удалось загрузить профиль</div>
-          <div style={secondaryTextStyle}>Попробуйте загрузить данные ещё раз.</div>
-          <div style={{ marginTop: 12 }}>
-            <button type="button" onClick={reloadProfile}>
-              Повторить
-            </button>
-          </div>
-        </div>
-      </div>
+      <CreateRunPageShell
+        title="Создать пробежку"
+        description="Заполните данные о пробежке и выберите точку на карте."
+        email={session?.user.email}
+        onBack={() => router.push('/')}
+        onSignOut={signOut}
+      >
+        <SectionBlock title="Не удалось загрузить профиль">
+          <p className="text-sm text-muted-foreground">Попробуйте загрузить данные ещё раз.</p>
+          <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={reloadProfile}>
+            Повторить
+          </Button>
+        </SectionBlock>
+      </CreateRunPageShell>
     )
   }
 
   if (!hasCompletedProfile) {
     return (
-      <div style={pageStyle}>
-        <h1 style={{ marginBottom: 8 }}>Создать пробежку</h1>
-        <p style={{ ...secondaryTextStyle, marginTop: 0, marginBottom: 20 }}>
-          Заполните данные о пробежке и выберите точку на карте.
-        </p>
-        <div style={{ ...secondaryTextStyle, marginBottom: 16 }}>
-          Вы вошли как {session.user.email}{' '}
-          <button type="button" onClick={signOut}>
-            Выйти
-          </button>
-        </div>
-        <div style={{ ...cardStyle, ...secondaryTextStyle }}>Перенаправляем на заполнение профиля...</div>
-      </div>
+      <CreateRunPageShell
+        title="Создать пробежку"
+        description="Заполните данные о пробежке и выберите точку на карте."
+        email={session?.user.email}
+        onBack={() => router.push('/')}
+        onSignOut={signOut}
+      >
+        <SectionBlock>
+          <p className="text-sm text-muted-foreground">Перенаправляем на заполнение профиля...</p>
+        </SectionBlock>
+      </CreateRunPageShell>
     )
   }
 
   return (
-    <div style={pageStyle}>
-      <h1 style={{ marginBottom: 8 }}>Создать пробежку</h1>
-
-      <div style={{ ...secondaryTextStyle, marginBottom: 16 }}>
-        Вы вошли как {session.user.email}{' '}
-        <button type="button" onClick={signOut}>
-          Выйти
-        </button>
-      </div>
-
-      <form id="create-run-form" onSubmit={createRun} style={formStyle}>
-        <div style={sectionStyle}>
-          <h2 style={sectionTitleStyle}>Основное</h2>
-          <label htmlFor="time" style={labelStyle}>
-            Дата и время
-            <input
-              id="time"
-              type="datetime-local"
-              value={time}
-              onChange={(event) => setTime(event.target.value)}
-              required
-              style={inputStyle}
-            />
-          </label>
-
-          <label htmlFor="duration_minutes" style={labelStyle}>
-            Длительность
-            <input
-              id="duration_minutes"
-              type="number"
-              min="1"
-              step="1"
-              value={durationMinutes}
-              onChange={(event) => setDurationMinutes(event.target.value)}
-              required
-              style={inputStyle}
-            />
-          </label>
-        </div>
-
-        <div style={{ ...sectionStyle, ...sectionSpacingStyle }}>
-          <h2 style={sectionTitleStyle}>Темп</h2>
-          <label htmlFor="pace" style={labelStyle}>
-            Темп
-            <input
-              id="pace"
-              type="text"
-              inputMode="numeric"
-              placeholder="05:30"
-              value={pace}
-              onChange={(event) => setPace(normalizePaceInput(event.target.value))}
-              onBlur={(event) => setPace(finalizePaceInput(event.target.value))}
-              required
-              aria-invalid={!isPaceValid}
-              style={inputStyle}
-            />
-          </label>
-
-          <div style={chipListStyle}>
-            {paceOptions.map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => setPace(option)}
-                style={{
-                  ...chipStyle,
-                  borderColor: selectedPace === option ? '#2563eb' : '#cbd5e1',
-                  backgroundColor: selectedPace === option ? '#dbeafe' : chipStyle.backgroundColor,
-                  color: selectedPace === option ? '#1d4ed8' : '#0f172a',
-                }}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
-
-          {!isPaceValid && (
-            <div style={{ color: '#b91c1c', fontSize: 14 }}>Введите темп в формате мм:сс.</div>
-          )}
-        </div>
-
-        <div style={{ ...sectionStyle, ...sectionSpacingStyle }}>
-          <h2 style={sectionTitleStyle}>Место старта</h2>
-          <label htmlFor="location_name" style={labelStyle}>
-            Место
-            <div ref={locationInputGroupRef} style={inputGroupStyle}>
-              <input
-                id="location_name"
-                type="text"
-                value={locationName}
-                onChange={(event) => {
-                  setLocationName(event.target.value)
-                  setLocationLookupError(null)
-                  if (event.target.value.trim().length < 3) {
-                    setIsLoadingLocationSuggestions(false)
-                    setLocationSuggestions([])
-                  }
-                  setShowLocationSuggestions(true)
-                }}
-                onFocus={() => {
-                  if (locationName.trim().length >= 3) {
-                    setShowLocationSuggestions(true)
-                  } else {
-                    setIsLoadingLocationSuggestions(false)
-                  }
-                }}
-                autoComplete="off"
+    <>
+      <CreateRunPageShell
+        title="Создать пробежку"
+        description="Заполните ключевые детали, выберите место старта и опубликуйте пробежку для других участников."
+        email={session?.user.email}
+        onBack={() => router.push('/')}
+        onSignOut={signOut}
+      >
+        <form id="create-run-form" onSubmit={createRun} className="space-y-4">
+          <SectionBlock title="Основное" description="Дата, время и длительность пробежки.">
+            <Field htmlFor="time" label="Дата и время">
+              <Input
+                id="time"
+                type="datetime-local"
+                value={time}
+                onChange={(event) => setTime(event.target.value)}
                 required
-                style={inputStyle}
+                className="bg-background"
               />
-              {showLocationSuggestions &&
-                (isLoadingLocationSuggestions || locationSuggestions.length > 0) && (
-                  <ul style={suggestionsListStyle}>
-                    {isLoadingLocationSuggestions && <li style={suggestionStatusStyle}>Ищем адрес...</li>}
-                    {!isLoadingLocationSuggestions &&
-                      locationSuggestions.map((suggestion, index) => (
-                        <li key={`${suggestion.label}-${suggestion.latitude}-${suggestion.longitude}`}>
-                          <button
-                            type="button"
-                            onPointerDown={(event) => {
-                              event.preventDefault()
-                              selectLocationSuggestion(suggestion)
-                            }}
-                            style={{
-                              ...suggestionButtonStyle,
-                              borderBottom:
-                                index === locationSuggestions.length - 1
-                                  ? '0'
-                                  : suggestionButtonStyle.borderBottom,
-                            }}
-                          >
-                            {suggestion.label}
-                          </button>
-                        </li>
-                      ))}
-                  </ul>
-                )}
+            </Field>
+
+            <Field htmlFor="duration_minutes" label="Длительность, минут">
+              <Input
+                id="duration_minutes"
+                type="number"
+                min="1"
+                step="1"
+                value={durationMinutes}
+                onChange={(event) => setDurationMinutes(event.target.value)}
+                required
+                className="bg-background"
+              />
+            </Field>
+          </SectionBlock>
+
+          <SectionBlock title="Темп" description="Укажите целевой темп в формате мм:сс.">
+            <Field htmlFor="pace" label="Темп">
+              <Input
+                id="pace"
+                type="text"
+                inputMode="numeric"
+                placeholder="05:30"
+                value={pace}
+                onChange={(event) => setPace(normalizePaceInput(event.target.value))}
+                onBlur={(event) => setPace(finalizePaceInput(event.target.value))}
+                required
+                aria-invalid={!isPaceValid}
+                className="bg-background"
+              />
+            </Field>
+
+            <div className="flex flex-wrap gap-2">
+              {paceOptions.map((option) => (
+                <Button
+                  key={option}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPace(option)}
+                  className={cn(
+                    'h-10 rounded-full px-4',
+                    selectedPace === option && 'border-primary bg-primary/10 text-primary hover:bg-primary/15'
+                  )}
+                >
+                  {option}
+                </Button>
+              ))}
             </div>
-          </label>
 
-          <div style={locationStatusStyle}>{locationStatusText}</div>
-          {locationLookupError && (
-            <div style={{ color: '#b91c1c', fontSize: 14 }}>{locationLookupError}</div>
-          )}
+            {!isPaceValid ? (
+              <p className="text-sm text-destructive">Введите темп в формате мм:сс.</p>
+            ) : null}
+          </SectionBlock>
 
-          <div style={mapBlockStyle}>
-            <button
-              type="button"
-              onClick={() => setShowMap((currentValue) => !currentValue)}
-              style={secondaryButtonStyle}
-            >
-              {showMap ? 'Скрыть карту' : '📍 Выбрать на карте'}
-            </button>
+          <SectionBlock title="Место старта" description="Можно ввести адрес, выбрать точку на карте или использовать геолокацию.">
+            <Field htmlFor="location_name" label="Место">
+              <div ref={locationInputGroupRef} className="relative">
+                <Input
+                  id="location_name"
+                  type="text"
+                  value={locationName}
+                  onChange={(event) => {
+                    setLocationName(event.target.value)
+                    setLocationLookupError(null)
+                    if (event.target.value.trim().length < 3) {
+                      setIsLoadingLocationSuggestions(false)
+                      setLocationSuggestions([])
+                    }
+                    setShowLocationSuggestions(true)
+                  }}
+                  onFocus={() => {
+                    if (locationName.trim().length >= 3) {
+                      setShowLocationSuggestions(true)
+                    } else {
+                      setIsLoadingLocationSuggestions(false)
+                    }
+                  }}
+                  autoComplete="off"
+                  required
+                  className="bg-background"
+                />
+                {showLocationSuggestions &&
+                  (isLoadingLocationSuggestions || locationSuggestions.length > 0) && (
+                    <ul className="absolute inset-x-0 top-full z-10 mt-2 overflow-hidden rounded-xl border border-border bg-background shadow-lg">
+                      {isLoadingLocationSuggestions ? (
+                        <li className="px-4 py-3 text-sm text-muted-foreground">Ищем адрес...</li>
+                      ) : (
+                        locationSuggestions.map((suggestion, index) => (
+                          <li key={`${suggestion.label}-${suggestion.latitude}-${suggestion.longitude}`}>
+                            <button
+                              type="button"
+                              onPointerDown={(event) => {
+                                event.preventDefault()
+                                selectLocationSuggestion(suggestion)
+                              }}
+                              className={cn(
+                                'w-full px-4 py-3 text-left text-sm text-foreground transition-colors hover:bg-muted',
+                                index !== locationSuggestions.length - 1 && 'border-b border-border'
+                              )}
+                            >
+                              {suggestion.label}
+                            </button>
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  )}
+              </div>
+            </Field>
 
-            {showMap && (
-              <RunLocationPicker
-                apiKey={mapApiKey}
-                value={selectedCoordinates}
-                onChange={handleSelectedCoordinatesChange}
-              />
-            )}
-          </div>
+            <div className="rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
+              {locationStatusText}
+            </div>
 
-          <div style={actionRowStyle}>
-            <button
-              type="button"
-              onClick={useMyLocation}
-              disabled={isLocatingUser}
-              style={secondaryButtonStyle}
-            >
-              {isLocatingUser ? 'Определяем геопозицию...' : 'Моя геопозиция'}
-            </button>
-            {selectedCoordinates && (
-              <button
+            {locationLookupError ? (
+              <p className="text-sm text-destructive">{locationLookupError}</p>
+            ) : null}
+
+            <div className="space-y-3">
+              <Button
                 type="button"
-                onClick={() => handleSelectedCoordinatesChange(null)}
-                style={secondaryButtonStyle}
+                variant="outline"
+                className="h-11 w-full justify-start rounded-xl"
+                onClick={() => setShowMap((currentValue) => !currentValue)}
               >
-                Очистить точку
-              </button>
-            )}
-          </div>
+                <MapPinned className="size-4" />
+                {showMap ? 'Скрыть карту' : 'Выбрать на карте'}
+              </Button>
 
-          {geolocationError && <div style={{ color: '#b91c1c', fontSize: 14 }}>{geolocationError}</div>}
-        </div>
-      </form>
+              {showMap ? (
+                <RunLocationPicker
+                  apiKey={mapApiKey}
+                  value={selectedCoordinates}
+                  onChange={handleSelectedCoordinatesChange}
+                />
+              ) : null}
+            </div>
 
-      <div style={stickyActionBarStyle}>
-        <div style={stickyActionInnerStyle}>
-          <button
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 flex-1 rounded-xl"
+                onClick={useMyLocation}
+                disabled={isLocatingUser}
+              >
+                <LocateFixed className="size-4" />
+                {isLocatingUser ? 'Определяем геопозицию...' : 'Моя геопозиция'}
+              </Button>
+              {selectedCoordinates ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 rounded-xl"
+                  onClick={() => handleSelectedCoordinatesChange(null)}
+                >
+                  <X className="size-4" />
+                  Очистить точку
+                </Button>
+              ) : null}
+            </div>
+
+            {geolocationError ? (
+              <p className="text-sm text-destructive">{geolocationError}</p>
+            ) : null}
+          </SectionBlock>
+        </form>
+      </CreateRunPageShell>
+
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border/80 bg-background/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] pt-3 backdrop-blur">
+        <div className="mx-auto max-w-[480px]">
+          <Button
             type="submit"
             form="create-run-form"
             disabled={isSubmitDisabled}
-            style={{
-              ...primaryButtonStyle,
-              opacity: isSubmitDisabled ? 0.7 : 1,
-            }}
+            className="h-14 w-full rounded-2xl text-base font-semibold shadow-lg shadow-primary/20"
           >
+            <TimerReset className="size-5" />
             Создать пробежку
-          </button>
+          </Button>
         </div>
       </div>
-    </div>
+    </>
   )
 }
