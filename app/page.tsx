@@ -226,10 +226,6 @@ export default function Home() {
   }, [authProfileStatus, hasCompletedProfile, router])
 
   useEffect(() => {
-    if (authProfileStatus !== 'ready' || !session || !hasCompletedProfile) {
-      return
-    }
-
     let isMounted = true
     setIsRunsLoading(true)
     setRunsLoadError(null)
@@ -264,7 +260,7 @@ export default function Home() {
     return () => {
       isMounted = false
     }
-  }, [authProfileStatus, hasCompletedProfile, session])
+  }, [])
 
   async function signOut() {
     const { error } = await supabase.auth.signOut()
