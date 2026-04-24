@@ -134,6 +134,9 @@ export default function Home() {
   const { session, authProfileStatus, isBootstrapResolved, profile, profileError, reloadProfile } =
     useAuthProfile()
   const [runs, setRuns] = useState<Run[]>([])
+  const [isRunsLoading, setIsRunsLoading] = useState(false)
+  const [hasLoadedRuns, setHasLoadedRuns] = useState(false)
+  const [runsLoadError, setRunsLoadError] = useState<string | null>(null)
   const [expandedRunIds, setExpandedRunIds] = useState<Record<string, boolean>>({})
   const hasCompletedProfile = isProfileComplete(profile)
   const shouldShowSplash =
@@ -228,17 +231,33 @@ export default function Home() {
     }
 
     let isMounted = true
+    setIsRunsLoading(true)
+    setRunsLoadError(null)
 
     void (async () => {
       try {
         const res = await fetch('/api/runs/list')
+
+        if (!res.ok) {
+          throw new Error('Failed to load runs')
+        }
+
         const data: Run[] = await res.json()
 
         if (isMounted) {
           setRuns(data)
+          setHasLoadedRuns(true)
+          setIsRunsLoading(false)
         }
       } catch (error) {
         console.error(error)
+
+        if (isMounted) {
+          setRuns([])
+          setRunsLoadError('Не удалось загрузить пробежки. Попробуйте обновить страницу.')
+          setHasLoadedRuns(true)
+          setIsRunsLoading(false)
+        }
       }
     })()
 
@@ -294,7 +313,17 @@ export default function Home() {
       </Button>
 
       <section className="divide-y divide-border/50">
-        {runs.length === 0 ? (
+        {isRunsLoading && !hasLoadedRuns ? (
+          <SectionBlock>
+            <p className="text-sm text-muted-foreground">Загружаем пробежки…</p>
+          </SectionBlock>
+        ) : runsLoadError ? (
+          <SectionBlock>
+            <p className="text-sm text-muted-foreground">
+              Не удалось загрузить пробежки. Попробуйте обновить страницу.
+            </p>
+          </SectionBlock>
+        ) : hasLoadedRuns && runs.length === 0 ? (
           <SectionBlock>
             <p className="text-sm text-muted-foreground">Пока нет пробежек.</p>
           </SectionBlock>
