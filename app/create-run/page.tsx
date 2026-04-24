@@ -224,6 +224,14 @@ function formatDateValue(value: Date): string {
   ].join('.')
 }
 
+function getDateValueFromInput(value: string): Date | null {
+  const parsedDate = parseDateInput(value)
+
+  return parsedDate
+    ? new Date(parsedDate.year, parsedDate.month - 1, parsedDate.day)
+    : null
+}
+
 function getTodayDate(): Date {
   const today = new Date()
   return new Date(today.getFullYear(), today.getMonth(), today.getDate())
@@ -449,40 +457,42 @@ function CalendarDateField({
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [visibleMonth, setVisibleMonth] = useState(() => getCalendarMonthStart(value))
-  const containerRef = useRef<HTMLDivElement | null>(null)
-  const selectedDate = parseDateInput(value)
-  const selectedDateValue = selectedDate
-    ? new Date(selectedDate.year, selectedDate.month - 1, selectedDate.day)
-    : null
+  const [draftDateValue, setDraftDateValue] = useState<Date | null>(() => getDateValueFromInput(value))
+  const selectedDateValue = getDateValueFromInput(value)
   const today = getTodayDate()
   const visibleDays = buildCalendarDays(visibleMonth)
 
   const openPicker = useCallback(() => {
+    setDraftDateValue(getDateValueFromInput(value))
     setVisibleMonth(getCalendarMonthStart(value))
     setIsOpen(true)
   }, [value])
 
-  function handleDateSelect(nextDate: Date) {
-    onChange(formatDateValue(nextDate))
-    setVisibleMonth(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1))
+  function closePicker() {
     setIsOpen(false)
+  }
+
+  function handleDateSelect(nextDate: Date) {
+    setDraftDateValue(nextDate)
+  }
+
+  function applyDateSelection() {
+    if (draftDateValue == null) {
+      return
+    }
+
+    onChange(formatDateValue(draftDateValue))
+    closePicker()
+  }
+
+  function selectToday() {
+    setDraftDateValue(today)
+    setVisibleMonth(new Date(today.getFullYear(), today.getMonth(), 1))
   }
 
   useEffect(() => {
     if (!isOpen) {
       return
-    }
-
-    function handlePointerDown(event: MouseEvent | TouchEvent) {
-      if (!containerRef.current) {
-        return
-      }
-
-      const target = event.target
-
-      if (target instanceof Node && !containerRef.current.contains(target)) {
-        setIsOpen(false)
-      }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
@@ -491,137 +501,169 @@ function CalendarDateField({
       }
     }
 
-    document.addEventListener('mousedown', handlePointerDown)
-    document.addEventListener('touchstart', handlePointerDown)
     document.addEventListener('keydown', handleKeyDown)
 
     return () => {
-      document.removeEventListener('mousedown', handlePointerDown)
-      document.removeEventListener('touchstart', handlePointerDown)
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [isOpen])
 
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isOpen])
+
   return (
-    <div ref={containerRef} className="relative">
-      <Input
-        id={id}
-        type="text"
-        inputMode="none"
-        placeholder={placeholder}
-        value={value}
-        onClick={openPicker}
-        onFocus={openPicker}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowDown') {
-            event.preventDefault()
-            openPicker()
-          }
-        }}
-        readOnly
-        required={required}
-        aria-invalid={isInvalid}
-        aria-expanded={isOpen}
-        aria-haspopup="dialog"
-        aria-controls={`${id}-calendar`}
-        className="w-full max-w-full cursor-pointer bg-background pr-11"
-      />
-      <CalendarDays className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+    <>
+      <div className="relative">
+        <Input
+          id={id}
+          type="text"
+          inputMode="none"
+          placeholder={placeholder}
+          value={value}
+          onClick={openPicker}
+          onFocus={openPicker}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowDown') {
+              event.preventDefault()
+              openPicker()
+            }
+          }}
+          readOnly
+          required={required}
+          aria-invalid={isInvalid}
+          aria-expanded={isOpen}
+          aria-haspopup="dialog"
+          aria-controls={`${id}-calendar`}
+          className="w-full max-w-full cursor-pointer bg-background pr-11"
+        />
+        <CalendarDays className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+      </div>
 
       {isOpen ? (
         <div
-          id={`${id}-calendar`}
-          role="dialog"
-          aria-label="Выбор даты"
-          className="absolute inset-x-0 top-full z-20 mt-2 overflow-hidden rounded-2xl border border-border bg-background p-3 shadow-lg"
+          className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 px-4 pb-0 pt-6"
+          onClick={closePicker}
         >
-          <div className="flex items-center justify-between gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="rounded-xl"
-              onClick={() => setVisibleMonth((currentMonth) => addMonths(currentMonth, -1))}
-              aria-label="Предыдущий месяц"
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <p className="text-sm font-medium capitalize text-foreground">
-              {calendarMonthFormatter.format(visibleMonth)}
-            </p>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="rounded-xl"
-              onClick={() => setVisibleMonth((currentMonth) => addMonths(currentMonth, 1))}
-              aria-label="Следующий месяц"
-            >
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
+          <div
+            id={`${id}-calendar`}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Выбор даты"
+            className="w-full rounded-t-[28px] border border-border/70 bg-background px-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] pt-3 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-muted" />
 
-          <div className="mt-3 grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
-            {calendarWeekdayLabels.map((dayLabel) => (
-              <span key={dayLabel} className="py-1">
-                {dayLabel}
-              </span>
-            ))}
-          </div>
-
-          <div className="mt-1 grid grid-cols-7 gap-1">
-            {visibleDays.map((day) => {
-              const isSelected = selectedDateValue ? isSameDay(day, selectedDateValue) : false
-              const isCurrentMonth = day.getMonth() === visibleMonth.getMonth()
-              const isToday = isSameDay(day, today)
-
-              return (
-                <button
-                  key={`${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`}
+            <div className="mx-auto w-full max-w-[340px] rounded-3xl border border-border/70 bg-card p-3 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <Button
                   type="button"
-                  onClick={() => handleDateSelect(day)}
-                  className={cn(
-                    'flex h-10 items-center justify-center rounded-xl text-sm font-medium transition-colors',
-                    isSelected
-                      ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
-                      : 'text-foreground hover:bg-muted',
-                    !isCurrentMonth && !isSelected && 'text-muted-foreground/50',
-                    isToday && !isSelected && 'border border-primary/30'
-                  )}
-                  aria-label={day.toLocaleDateString('ru-RU', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                  })}
-                  aria-pressed={isSelected}
+                  variant="ghost"
+                  size="icon-sm"
+                  className="rounded-xl"
+                  onClick={() => setVisibleMonth((currentMonth) => addMonths(currentMonth, -1))}
+                  aria-label="Предыдущий месяц"
                 >
-                  {day.getDate()}
-                </button>
-              )
-            })}
-          </div>
+                  <ChevronLeft className="size-4" />
+                </Button>
+                <p className="text-sm font-semibold capitalize text-foreground">
+                  {calendarMonthFormatter.format(visibleMonth)}
+                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="rounded-xl"
+                  onClick={() => setVisibleMonth((currentMonth) => addMonths(currentMonth, 1))}
+                  aria-label="Следующий месяц"
+                >
+                  <ChevronRight className="size-4" />
+                </Button>
+              </div>
 
-          <div className="mt-3 flex justify-between gap-2 border-t border-border/60 pt-3">
-            <Button
-              type="button"
-              variant="ghost"
-              className="h-9 rounded-xl px-3 text-sm"
-              onClick={() => setIsOpen(false)}
-            >
-              Закрыть
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-9 rounded-xl px-3 text-sm"
-              onClick={() => handleDateSelect(today)}
-            >
-              Сегодня
-            </Button>
+              <div className="mt-3 grid grid-cols-7 gap-1.5 text-center text-[11px] font-medium text-muted-foreground">
+                {calendarWeekdayLabels.map((dayLabel) => (
+                  <span key={dayLabel} className="py-1">
+                    {dayLabel}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-1.5 grid grid-cols-7 gap-1.5">
+                {visibleDays.map((day) => {
+                  const isSelected = draftDateValue ? isSameDay(day, draftDateValue) : false
+                  const isCommittedDate = selectedDateValue ? isSameDay(day, selectedDateValue) : false
+                  const isCurrentMonth = day.getMonth() === visibleMonth.getMonth()
+                  const isToday = isSameDay(day, today)
+
+                  return (
+                    <button
+                      key={`${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`}
+                      type="button"
+                      onClick={() => handleDateSelect(day)}
+                      className={cn(
+                        'aspect-square min-h-10 rounded-2xl text-sm font-medium transition-colors',
+                        isSelected
+                          ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
+                          : 'text-foreground hover:bg-muted',
+                        !isCurrentMonth && !isSelected && 'text-muted-foreground/50',
+                        isToday && !isSelected && 'border border-primary/30',
+                        isCommittedDate && !isSelected && 'bg-primary/10 text-primary'
+                      )}
+                      aria-label={day.toLocaleDateString('ru-RU', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                      })}
+                      aria-pressed={isSelected}
+                    >
+                      {day.getDate()}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="mx-auto mt-4 flex w-full max-w-[340px] gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-11 flex-1 rounded-2xl text-sm"
+                onClick={closePicker}
+              >
+                Отмена
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 flex-1 rounded-2xl text-sm"
+                onClick={selectToday}
+              >
+                Сегодня
+              </Button>
+              <Button
+                type="button"
+                className="h-11 flex-1 rounded-2xl text-sm font-semibold shadow-lg shadow-primary/20"
+                onClick={applyDateSelection}
+                disabled={draftDateValue == null}
+              >
+                Готово
+              </Button>
+            </div>
           </div>
         </div>
       ) : null}
-    </div>
+    </>
   )
 }
 
