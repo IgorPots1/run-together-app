@@ -1,0 +1,13 @@
+---
+description: Mobile-first PWA UX rules for UI, layout, forms, navigation, maps, and CSS
+globs: app/**/*.tsx,app/**/*.css,components/**/*.tsx,components/**/*.css,app/**/layout.*,app/**/page.*,app/**/*form*,app/**/*nav*,app/**/*map*,components/**/*form*,components/**/*nav*,components/**/*map*
+alwaysApply: false
+---
+
+# Mobile PWA UX
+
+- Account for mobile-first PWA behavior.
+- Check safe-area insets, dynamic viewport height, keyboard behavior, bottom overlap, horizontal overflow, and map/suggestions overlays.
+- Keep mobile UI compact.
+- Avoid layout changes that make iOS/Android PWA behavior worse.
+- Address selection/autocomplete UI must not cause page jumps or overflow.

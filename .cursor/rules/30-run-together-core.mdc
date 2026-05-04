@@ -1,0 +1,15 @@
+---
+description: Core MVP flow rules for runs, participants, auth, maps, Telegram, and notifications
+globs: app/**/*run*,app/**/*participant*,app/**/*auth*,app/**/*map*,app/**/*geo*,app/**/*telegram*,app/**/*notification*,app/api/**/*,components/**/*run*,components/**/*participant*,components/**/*map*,lib/**/*run*,lib/**/*participant*,lib/**/*auth*,lib/**/*geo*,lib/**/*map*,lib/**/*telegram*,lib/**/*notification*
+alwaysApply: false
+---
+
+# Run Together Core
+
+- Treat run creation, join flow, participants, geo/maps, auth, and notifications as sensitive MVP systems.
+- Keep the product lightweight.
+- Avoid adding complex social features unless explicitly requested.
+- Preserve the simple create -> list -> join flow.
+- Keep future native mobile migration low-pain.
+- Keep business logic separate from UI where practical.
+- For geo/map or notification bugs, start with audit-only before implementation.

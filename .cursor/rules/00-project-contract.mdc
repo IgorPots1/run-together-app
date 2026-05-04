@@ -1,0 +1,15 @@
+---
+description: Core project contract for keeping Run Together simple and production-safe
+alwaysApply: true
+---
+
+# Project Contract
+
+- Keep scope minimal and aligned with the lightweight MVP.
+- Do not overengineer MVP features.
+- Prefer simple, readable, production-safe code.
+- Do not introduce broad refactors unless explicitly requested.
+- Preserve current user-facing behavior unless explicitly requested.
+- Keep user-facing UI in Russian unless explicitly requested otherwise.
+- For risky tasks, start with audit/plan mode before implementation.
+- Always summarize changed files and provide a commit message.

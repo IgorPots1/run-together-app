@@ -1,0 +1,14 @@
+---
+description: QA and reporting gates for implementation work
+alwaysApply: true
+---
+
+# QA and Commit Gates
+
+- After implementation, run `npm run lint` and `npm run build` unless explicitly skipped.
+- For UI changes, include manual mobile QA notes.
+- For geo/map/auth/join-flow changes, include regression risks.
+- Report changed files.
+- Report verification results.
+- Provide a concise git commit command.
+- Do not claim checks passed unless they actually ran.
